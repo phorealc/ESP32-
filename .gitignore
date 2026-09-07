@@ -17,7 +17,7 @@ checklist.json
 # --- ESP32 / PlatformIO ---
 esp32-firmware/.pio/
 esp32-firmware/.vscode/
-esp32-firmware/src/secrets.h
+esp32-firmware/include/app_config.h
 
 # --- Tauri / Node ---
 node_modules/

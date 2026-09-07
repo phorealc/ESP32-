@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  engine:
+    name: Moteur Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installer le moteur
+        run: pip install -e "engine[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check engine
+
+      - name: Tests (pytest)
+        run: pytest engine/tests -q
+
+  firmware:
+    name: Logique firmware (tests natifs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # La compilation croisee ESP32 demande la toolchain PlatformIO ; ces
+      # tests-la couvrent la logique portable et tournent en quelques secondes.
+      - name: Tests natifs
+        run: ./esp32-firmware/test/run_native_tests.sh
+
+  frontend:
+    name: Coquille PC
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verifier la syntaxe du frontend
+        run: node --check app-pc/src/main.js
+
+      - name: Verifier les manifestes JSON
+        run: |
+          for file in app-pc/package.json \
+                      app-pc/src-tauri/tauri.conf.json \
+                      app-pc/src-tauri/capabilities/default.json; do
+            node -e "JSON.parse(require('fs').readFileSync('$file','utf8'))" \
+              && echo "ok  $file"
+          done

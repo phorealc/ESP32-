@@ -1,0 +1,14 @@
+{
+  "name": "dashboard-pc",
+  "version": "0.1.0",
+  "description": "Coquille Tauri du Dashboard ESP32 (Phorealc)",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0"
+  }
+}

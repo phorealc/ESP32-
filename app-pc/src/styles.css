@@ -1,0 +1,341 @@
+/* Identite visuelle Phorealc — la palette doit rester alignee sur
+   esp32-firmware/src/ui/theme.h pour que les deux ecrans se ressemblent. */
+
+:root {
+  --bg: #0e0e13;
+  --surface: #181820;
+  --surface-2: #23232f;
+  --border: #2e2e3c;
+  --text: #f2f2f7;
+  --muted: #8a8a9c;
+  --accent: #7c5cff;
+  --accent-2: #25e0c8;
+  --ok: #3ddc84;
+  --warn: #ffb020;
+  --error: #ff4d5e;
+
+  --radius: 14px;
+  --gap: 14px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- barre superieure --- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; }
+
+.brand-mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
+.brand-name { font-weight: 700; letter-spacing: 0.22em; color: var(--accent); }
+.brand-sub { color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; font-size: 12px; }
+
+.link { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+.dot.ok { background: var(--ok); }
+.dot.warn { background: var(--warn); }
+.dot.error { background: var(--error); }
+.dot.live { background: var(--error); }
+
+/* --- grille --- */
+
+/* La checklist occupe une colonne pleine hauteur a droite : c'est le seul
+   panneau avec lequel on interagit, il doit rester atteignable sans defiler. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr minmax(300px, 0.85fr);
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "music   music   checklist"
+    "weather stream  checklist"
+    "servers servers checklist";
+  gap: var(--gap);
+  padding: var(--gap) 20px 20px;
+  min-height: calc(100vh - 58px);
+}
+
+.card-music { grid-area: music; }
+.card-weather { grid-area: weather; }
+.card-stream { grid-area: stream; }
+.card-servers { grid-area: servers; }
+.card-checklist { grid-area: checklist; }
+
+@media (max-width: 1080px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: none;
+    grid-template-areas:
+      "music     music"
+      "weather   stream"
+      "servers   servers"
+      "checklist checklist";
+    min-height: 0;
+  }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.card.unavailable { opacity: 0.55; }
+
+.caption {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.state {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.title { margin: 0; font-size: 26px; font-weight: 650; }
+.title-sm { margin: 8px 0 0; font-size: 18px; font-weight: 600; }
+.subtitle { margin: 4px 0 0; color: var(--muted); }
+
+.title, .subtitle, .title-sm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.temp { margin: 6px 0 0; font-size: 54px; font-weight: 300; line-height: 1; }
+
+/* --- barres de progression --- */
+
+.progress {
+  margin-top: auto;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+.progress-fill.ok { background: var(--ok); }
+
+.times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- tuiles de statistiques --- */
+
+.stats {
+  list-style: none;
+  display: flex;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.stats li {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.stats .k {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stats .v {
+  display: block;
+  margin-top: 2px;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- stream --- */
+
+.badge {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.badge.live { background: var(--error); color: #fff; }
+
+.obs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* --- serveurs --- */
+
+.server-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+
+.server-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.server-list .name { font-weight: 600; }
+.server-list .meta { display: block; font-size: 12px; color: var(--muted); }
+.server-list .players { font-size: 19px; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+.server-list .players.off { color: var(--error); }
+
+/* --- checklist --- */
+
+.checklist-head { display: flex; align-items: center; justify-content: space-between; }
+
+.checklist {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  /* `start` empeche les lignes de s'etirer pour remplir la colonne :
+     sans ca, trois taches occupent chacune un tiers de la hauteur. */
+  align-content: start;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.checklist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checklist li:hover { background: #2a2a38; }
+
+.checklist .box {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: transparent;
+}
+
+.checklist li.done .box { background: var(--ok); border-color: var(--ok); color: var(--bg); }
+.checklist li.done .text { color: var(--muted); text-decoration: line-through; }
+
+.checklist .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.checklist .remove {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0;
+}
+.checklist li:hover .remove { opacity: 1; }
+.checklist .remove:hover { color: var(--error); }
+
+.add-row { display: flex; gap: 8px; }
+
+.add-row input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+}
+.add-row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+button {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+
+.ghost { border: 0; background: none; color: var(--muted); font-size: 12px; padding: 2px 6px; }
+.ghost:hover { color: var(--text); }
+
+.empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Phorealc</title>
+    <link rel="icon" href="favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <span class="brand-name">PHOREALC</span>
+        <span class="brand-sub">Dashboard</span>
+      </div>
+      <div class="link" id="link">
+        <span class="dot" id="link-dot"></span>
+        <span id="link-text">Connexion au moteur…</span>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- Musique -->
+      <section class="card card-music" aria-labelledby="music-caption">
+        <p class="caption" id="music-caption">Musique</p>
+        <p class="state" id="music-state">—</p>
+        <h2 class="title" id="music-title">Aucune lecture</h2>
+        <p class="subtitle" id="music-artist"></p>
+        <div class="progress"><div class="progress-fill" id="music-progress"></div></div>
+        <div class="times">
+          <span id="music-elapsed">0:00</span>
+          <span id="music-total">0:00</span>
+        </div>
+      </section>
+
+      <!-- Meteo -->
+      <section class="card card-weather" aria-labelledby="weather-caption">
+        <p class="caption" id="weather-caption">Meteo</p>
+        <p class="state" id="weather-city">—</p>
+        <p class="temp" id="weather-temp">--°</p>
+        <p class="subtitle" id="weather-desc"></p>
+        <ul class="stats" id="weather-stats"></ul>
+      </section>
+
+      <!-- Stream -->
+      <section class="card card-stream" aria-labelledby="stream-caption">
+        <p class="caption" id="stream-caption">Stream</p>
+        <span class="badge" id="stream-badge">HORS LIGNE</span>
+        <h3 class="title-sm" id="stream-title">—</h3>
+        <p class="subtitle" id="stream-game"></p>
+        <ul class="stats" id="stream-stats"></ul>
+        <p class="obs" id="stream-obs"><span class="dot" id="obs-dot"></span><span id="obs-text">OBS deconnecte</span></p>
+      </section>
+
+      <!-- Serveurs -->
+      <section class="card card-servers" aria-labelledby="servers-caption">
+        <p class="caption" id="servers-caption">Serveurs Minecraft</p>
+        <p class="state" id="servers-summary">—</p>
+        <ul class="server-list" id="server-list"></ul>
+      </section>
+
+      <!-- Checklist -->
+      <section class="card card-checklist" aria-labelledby="checklist-caption">
+        <div class="checklist-head">
+          <p class="caption" id="checklist-caption">Checklist</p>
+          <button class="ghost" id="checklist-reset" type="button">Tout decocher</button>
+        </div>
+        <div class="progress"><div class="progress-fill ok" id="checklist-progress"></div></div>
+        <ul class="checklist" id="checklist"></ul>
+        <form class="add-row" id="checklist-form">
+          <input id="checklist-input" type="text" placeholder="Ajouter une tache…" maxlength="120" />
+          <button type="submit">Ajouter</button>
+        </form>
+      </section>
+    </main>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

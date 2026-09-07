@@ -1,0 +1,30 @@
+# --- Python / engine ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# --- secrets et etat local ---
+engine/config.toml
+checklist.json
+.env
+
+# --- ESP32 / PlatformIO ---
+esp32-firmware/.pio/
+esp32-firmware/.vscode/
+esp32-firmware/src/secrets.h
+
+# --- Tauri / Node ---
+node_modules/
+app-pc/dist/
+app-pc/src-tauri/target/
+app-pc/src-tauri/binaries/
+
+# --- divers ---
+.DS_Store
+Thumbs.db

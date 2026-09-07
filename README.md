@@ -26,9 +26,20 @@ trois briques sont donc directement ici plutot que sous un niveau supplementaire
 ```bash
 cd engine
 python -m venv .venv && .venv/bin/pip install -e ".[dev]"
-cp config.example.toml config.toml     # puis renseigner cles API et serveurs
 .venv/bin/python -m dashboard_engine
 ```
+
+Au premier lancement, le moteur ecrit un `config.toml` commente et affiche son
+chemin. En developpement (depuis `engine/`) c'est le dossier courant ; pour
+l'application installee, le dossier utilisateur :
+
+| Systeme | Emplacement |
+| --- | --- |
+| Windows | `%APPDATA%\Phorealc\Dashboard\config.toml` |
+| macOS | `~/Library/Application Support/Phorealc/Dashboard/config.toml` |
+| Linux | `~/.config/phorealc-dashboard/config.toml` |
+
+`checklist.json` se range a cote.
 
 Au demarrage, le moteur affiche l'URL a reporter dans le firmware :
 
@@ -66,13 +77,45 @@ npm install
 npm run dev        # se connecte au moteur deja lance
 ```
 
-Pour un executable autonome, placez le moteur compile (PyInstaller) dans
-`src-tauri/binaries/dashboard-engine-<triple>` puis `npm run build` — la
-coquille le lancera alors elle-meme en sidecar.
+## Installer l'application (Windows)
+
+Un installeur `.msi` et un `.exe` sont produits par GitHub Actions et attaches
+a chaque release. **Rien a installer d'autre** : le moteur Python est empaquete
+dans l'application, Python n'est pas requis sur la machine.
+
+### Publier une version
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+Le workflow [`release.yml`](.github/workflows/release.yml) construit alors sur
+`windows-latest` : PyInstaller empaquette le moteur, un test de fumee verifie
+que le binaire demarre vraiment (c'est la que se voient les imports dynamiques
+manquants), puis Tauri produit les installeurs et les attache a une release
+en brouillon.
+
+L'onglet **Actions → Release → Run workflow** lance la meme chaine sans tag :
+les installeurs sortent alors en artefact de build, pratique pour tester.
+
+### Construire en local (sur Windows)
+
+```powershell
+pip install ./engine pyinstaller
+cd engine; pyinstaller dashboard-engine.spec --noconfirm
+mkdir ..\app-pc\src-tauri\binaries
+copy dist\dashboard-engine.exe ..\app-pc\src-tauri\binaries\dashboard-engine-x86_64-pc-windows-msvc.exe
+cd ..\app-pc; npm install; npm run build
+```
+
+Le suffixe est le triplet de la cible (`rustc -Vv`), c'est ainsi que Tauri
+retrouve son sidecar. Le build doit tourner **sur Windows** : Tauri ne
+compile pas d'installeur Windows depuis Linux.
 
 ## Configuration
 
-`engine/config.toml` (copie de `config.example.toml`) regroupe tout. Les secrets
+Le `config.toml` cree au premier lancement (copie de
+`engine/dashboard_engine/config.example.toml`) regroupe tout. Les secrets
 peuvent rester hors du fichier et venir de l'environnement :
 
 | Variable | Remplace |

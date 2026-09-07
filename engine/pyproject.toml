@@ -30,6 +30,11 @@ dashboard-engine = "dashboard_engine.__main__:main"
 [tool.setuptools.packages.find]
 include = ["dashboard_engine*"]
 
+# Le modele de configuration voyage avec le paquet : l'application installee
+# s'en sert pour creer un config.toml editable au premier lancement.
+[tool.setuptools.package-data]
+dashboard_engine = ["config.example.toml"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

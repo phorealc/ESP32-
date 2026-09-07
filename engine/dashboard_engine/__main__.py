@@ -9,7 +9,12 @@ from pathlib import Path
 
 import uvicorn
 
-from dashboard_engine.config import DEFAULT_CONFIG_NAME, load_config
+from dashboard_engine.config import (
+    DEFAULT_CONFIG_NAME,
+    default_config_path,
+    ensure_config_file,
+    load_config,
+)
 from dashboard_engine.server import create_app
 
 
@@ -48,10 +53,16 @@ def main() -> None:
         datefmt="%H:%M:%S",
     )
 
-    config = load_config(args.config)
+    config_path = Path(args.config) if args.config else default_config_path()
+    if ensure_config_file(config_path):
+        print(f"[dashboard] configuration creee depuis le modele : {config_path}")
+        print("[dashboard] renseignez-y vos cles API puis relancez l'application.")
+
+    config = load_config(config_path)
     host = args.host or config.server.host
     port = args.port or config.server.port
 
+    print(f"[dashboard] configuration : {config_path}")
     if host in ("0.0.0.0", "::"):
         print(f"[dashboard] URL a renseigner dans l'ESP32 : http://{local_ip()}:{port}")
 

@@ -7,12 +7,16 @@ etre fournis par l'environnement, ce qui evite de les committer par accident.
 from __future__ import annotations
 
 import os
+import shutil
+import sys
 import tomllib
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 DEFAULT_CONFIG_NAME = "config.toml"
+TEMPLATE_NAME = "config.example.toml"
+APP_DIR_NAME = "Phorealc/Dashboard"
 
 # Variable d'environnement -> chemin pointe dans la config, en notation pointee.
 ENV_OVERRIDES: dict[str, str] = {
@@ -143,6 +147,64 @@ def apply_env_overrides(data: dict, env: dict[str, str] | None = None) -> dict:
     return data
 
 
+def user_config_dir() -> Path:
+    """Dossier de configuration par utilisateur, selon la plateforme.
+
+    C'est la que l'application installee range `config.toml` et
+    `checklist.json` : un binaire lance par Tauri (ou au demarrage de session)
+    n'a pas de repertoire courant previsible, et son dossier d'installation
+    n'est pas inscriptible.
+    """
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA") or Path.home() / "AppData/Roaming")
+        return base / APP_DIR_NAME
+    if sys.platform == "darwin":
+        return Path.home() / "Library/Application Support" / APP_DIR_NAME
+    base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    return base / "phorealc-dashboard"
+
+
+def template_path() -> Path:
+    """Modele de configuration livre avec le paquet.
+
+    Sous PyInstaller les donnees sont extraites dans `sys._MEIPASS` ; en
+    developpement le modele est simplement a cote du module.
+    """
+    bundle = getattr(sys, "_MEIPASS", None)
+    if bundle is not None:
+        bundled = Path(bundle) / "dashboard_engine" / TEMPLATE_NAME
+        if bundled.is_file():
+            return bundled
+    return Path(__file__).parent / TEMPLATE_NAME
+
+
+def default_config_path() -> Path:
+    """Emplacement du `config.toml` a utiliser quand aucun n'est impose.
+
+    Un fichier dans le repertoire courant l'emporte : c'est le mode de
+    developpement (`python -m dashboard_engine` depuis `engine/`). Sinon on
+    prend le dossier utilisateur, celui de l'application installee.
+    """
+    local = Path.cwd() / DEFAULT_CONFIG_NAME
+    return local if local.is_file() else user_config_dir() / DEFAULT_CONFIG_NAME
+
+
+def ensure_config_file(path: Path) -> bool:
+    """Cree `path` a partir du modele s'il n'existe pas. True si cree.
+
+    Sans ca, un utilisateur qui installe le .exe n'a aucun fichier a editer et
+    doit deviner le format ; la, il trouve un modele commente a la bonne place.
+    """
+    if path.exists():
+        return False
+    template = template_path()
+    if not template.is_file():
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(template, path)
+    return True
+
+
 def load_config(path: str | Path | None = None) -> Config:
     """Charge la configuration depuis un TOML, puis applique l'environnement.
 
@@ -150,12 +212,14 @@ def load_config(path: str | Path | None = None) -> Config:
     demarrer le moteur (les modules sans cle API se signalent simplement comme
     indisponibles).
     """
-    config_path = Path(path) if path else Path.cwd() / DEFAULT_CONFIG_NAME
+    config_path = Path(path) if path else default_config_path()
     data: dict = {}
     if config_path.is_file():
         with config_path.open("rb") as handle:
             data = tomllib.load(handle)
     data = apply_env_overrides(data)
     config = Config.model_validate(data)
-    config.base_dir = config_path.parent if config_path.is_file() else Path.cwd()
+    # `base_dir` ancre les chemins relatifs (checklist.json) a cote du fichier
+    # de configuration, meme quand celui-ci n'existe pas encore.
+    config.base_dir = config_path.parent
     return config

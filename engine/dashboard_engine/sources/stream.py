@@ -7,10 +7,11 @@ from datetime import datetime
 
 import httpx
 
-from dashboard_engine.config import StreamConfig
-from dashboard_engine.models import ObsState, Stream
+from dashboard_engine.config import BroadcasterConfig, StreamConfig
+from dashboard_engine.models import Stream
 from dashboard_engine.sources.base import DisabledSource, Source
 from dashboard_engine.sources.obs import ObsClient
+from dashboard_engine.sources.streamlabs_desktop import StreamlabsDesktopClient
 
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 HELIX_URL = "https://api.twitch.tv/helix"
@@ -129,7 +130,7 @@ class StreamSource(Source[Stream]):
         self._twitch: TwitchClient | None = None
         if config.twitch_client_id and config.twitch_client_secret and config.twitch_login:
             self._twitch = TwitchClient(config.twitch_client_id, config.twitch_client_secret)
-        self._obs = ObsClient(config.obs) if config.obs.enabled else None
+        self._broadcaster = build_broadcaster_client(config.broadcaster)
 
     async def fetch(self) -> Stream:
         stream = Stream()
@@ -141,9 +142,10 @@ class StreamSource(Source[Stream]):
             except Exception as exc:
                 errors.append(f"twitch: {type(exc).__name__}")
 
-        stream.obs = await self._obs.poll() if self._obs is not None else ObsState()
+        if self._broadcaster is not None:
+            stream.broadcaster = await self._broadcaster.poll()
 
-        if errors and not stream.obs.connected:
+        if errors and not stream.broadcaster.connected:
             # Les deux moities sont muettes : on remonte l'echec pour declencher
             # le recul exponentiel du socle.
             raise RuntimeError(", ".join(errors))
@@ -152,8 +154,22 @@ class StreamSource(Source[Stream]):
     async def close(self) -> None:
         if self._twitch is not None:
             await self._twitch.close()
-        if self._obs is not None:
-            await self._obs.close()
+        if self._broadcaster is not None:
+            await self._broadcaster.close()
+
+
+def build_broadcaster_client(config: BroadcasterConfig):
+    """Client du logiciel de diffusion, ou `None` si aucun n'est demande."""
+    if config.kind == "obs":
+        return ObsClient(config)
+    if config.kind == "streamlabs":
+        return StreamlabsDesktopClient(
+            token=config.token,
+            host=config.host,
+            port=config.port,
+            use_pipe=config.use_pipe,
+        )
+    return None
 
 
 def build_stream_source(config: StreamConfig) -> Source[Stream]:
@@ -162,6 +178,8 @@ def build_stream_source(config: StreamConfig) -> Source[Stream]:
     has_twitch = bool(
         config.twitch_client_id and config.twitch_client_secret and config.twitch_login
     )
-    if not has_twitch and not config.obs.enabled:
-        return DisabledSource("stream", Stream(), "ni identifiants Twitch ni OBS configures")
+    if not has_twitch and config.broadcaster.kind == "none":
+        return DisabledSource(
+            "stream", Stream(), "ni identifiants Twitch ni logiciel de diffusion configures"
+        )
     return StreamSource(config)

@@ -41,10 +41,30 @@ twitch_client_id = ""     # https://dev.twitch.tv/console/apps
 twitch_client_secret = ""
 twitch_login = "phorealc"
 
-[stream.obs]
-enabled = true
+# Logiciel de diffusion interroge. Les deux ne parlent pas le meme protocole,
+# d'ou le choix explicite : "obs", "streamlabs", ou "none".
+[stream.broadcaster]
+kind = "streamlabs"
+
+# --- si kind = "obs" (OBS Studio) ---
 url = "ws://127.0.0.1:4455"   # OBS > Outils > Parametres du serveur WebSocket
 password = ""
+
+# --- si kind = "streamlabs" (Streamlabs Desktop) ---
+# Sous Windows, le tube nomme suffit : rien a activer, rien a renseigner.
+use_pipe = true
+# Repli TCP, a activer dans Streamlabs > Parametres > Remote Control.
+token = ""
+host = "127.0.0.1"
+port = 59650
+
+# Alertes en direct de streamlabs.com : dons, follows, abonnements.
+[stream.streamlabs]
+enabled = true
+# streamlabs.com > Parametres > API Settings > API Tokens > Socket API Token.
+# A traiter comme un mot de passe.
+socket_token = ""
+keep_events = 8
 
 [checklist]
 path = "checklist.json"

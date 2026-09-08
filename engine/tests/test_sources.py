@@ -7,6 +7,7 @@ import time
 import pytest
 
 from dashboard_engine.config import (
+    BroadcasterConfig,
     MinecraftConfig,
     MinecraftServerConfig,
     MusicConfig,
@@ -17,8 +18,13 @@ from dashboard_engine.models import Music
 from dashboard_engine.sources.base import MAX_BACKOFF_FACTOR, DisabledSource, Source
 from dashboard_engine.sources.minecraft import build_minecraft_source, clean_motd, query_server
 from dashboard_engine.sources.music import build_music_source
-from dashboard_engine.sources.obs import compute_auth
-from dashboard_engine.sources.stream import build_stream_source, parse_started_at
+from dashboard_engine.sources.obs import ObsClient, compute_auth
+from dashboard_engine.sources.stream import (
+    build_broadcaster_client,
+    build_stream_source,
+    parse_started_at,
+)
+from dashboard_engine.sources.streamlabs_desktop import StreamlabsDesktopClient
 from dashboard_engine.sources.weather import build_weather_source, parse_current, parse_forecast
 
 # --- socle ---------------------------------------------------------------
@@ -103,10 +109,26 @@ def test_minecraft_without_servers_is_disabled() -> None:
     assert isinstance(source, DisabledSource)
 
 
-def test_stream_without_twitch_still_runs_for_obs() -> None:
+def test_stream_without_twitch_still_runs_for_a_broadcaster() -> None:
+    """Sans Twitch, l'onglet garde son interet : l'etat local du logiciel."""
+    for kind in ("obs", "streamlabs"):
+        config = StreamConfig(enabled=True)
+        config.broadcaster.kind = kind
+        assert not isinstance(build_stream_source(config), DisabledSource), kind
+
+
+def test_stream_without_twitch_nor_broadcaster_is_disabled() -> None:
     config = StreamConfig(enabled=True)
-    config.obs.enabled = True
-    assert not isinstance(build_stream_source(config), DisabledSource)
+    config.broadcaster.kind = "none"
+    assert isinstance(build_stream_source(config), DisabledSource)
+
+
+def test_broadcaster_client_follows_the_configured_kind() -> None:
+    assert isinstance(build_broadcaster_client(BroadcasterConfig(kind="obs")), ObsClient)
+    assert isinstance(
+        build_broadcaster_client(BroadcasterConfig(kind="streamlabs")), StreamlabsDesktopClient
+    )
+    assert build_broadcaster_client(BroadcasterConfig(kind="none")) is None
 
 
 # --- Minecraft -----------------------------------------------------------

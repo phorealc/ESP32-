@@ -22,6 +22,7 @@ def config(tmp_path: Path) -> Config:
     cfg.minecraft.enabled = False
     cfg.weather.enabled = False
     cfg.stream.enabled = False
+    cfg.stream.streamlabs.enabled = False
     cfg.checklist.path = "checklist.json"
     cfg.checklist.default_items = ["Lancer OBS", "Verifier le micro"]
     return cfg

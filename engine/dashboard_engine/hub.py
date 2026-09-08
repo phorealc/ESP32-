@@ -13,6 +13,7 @@ from dashboard_engine.sources.base import Source
 from dashboard_engine.sources.minecraft import build_minecraft_source
 from dashboard_engine.sources.music import MusicSource, build_music_source
 from dashboard_engine.sources.stream import build_stream_source
+from dashboard_engine.sources.streamlabs_alerts import build_alerts_source
 from dashboard_engine.sources.weather import build_weather_source
 
 log = logging.getLogger(__name__)
@@ -27,12 +28,13 @@ class Hub:
         self.servers = build_minecraft_source(config.minecraft)
         self.weather = build_weather_source(config.weather)
         self.stream = build_stream_source(config.stream)
+        self.donations = build_alerts_source(config.stream.streamlabs)
         self.checklist = ChecklistStore(config.checklist_path(), config.checklist.default_items)
         self.started_at = time.time()
 
     @property
     def sources(self) -> list[Source]:
-        return [self.music, self.servers, self.weather, self.stream]
+        return [self.music, self.servers, self.weather, self.stream, self.donations]
 
     async def start(self) -> None:
         for source in self.sources:
@@ -51,6 +53,7 @@ class Hub:
             servers=self.servers.payload,
             weather=self.weather.payload,
             stream=self.stream.payload,
+            donations=self.donations.payload,
             checklist=self.checklist.state(),
         )
 
@@ -67,6 +70,9 @@ SLIM_DROP = {
     "servers": ("error", "updated_at"),
     "weather": ("forecast", "temp_min_c", "temp_max_c", "sunrise", "sunset", "error", "updated_at"),
     "stream": ("error", "updated_at"),
+    # L'ESP32 n'affiche pas encore le detail des alertes : on lui laisse les
+    # totaux, qui tiennent en quelques octets, et on retire la liste.
+    "donations": ("recent", "error", "updated_at"),
 }
 SLIM_DROP_SERVER_ITEM = ("motd", "error")
 

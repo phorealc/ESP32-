@@ -28,8 +28,10 @@ ENV_OVERRIDES: dict[str, str] = {
     "DASHBOARD_TWITCH_CLIENT_ID": "stream.twitch_client_id",
     "DASHBOARD_TWITCH_CLIENT_SECRET": "stream.twitch_client_secret",
     "DASHBOARD_TWITCH_LOGIN": "stream.twitch_login",
-    "DASHBOARD_OBS_PASSWORD": "stream.obs.password",
-    "DASHBOARD_OBS_URL": "stream.obs.url",
+    "DASHBOARD_OBS_PASSWORD": "stream.broadcaster.password",
+    "DASHBOARD_OBS_URL": "stream.broadcaster.url",
+    "DASHBOARD_STREAMLABS_TOKEN": "stream.broadcaster.token",
+    "DASHBOARD_STREAMLABS_SOCKET_TOKEN": "stream.streamlabs.socket_token",
 }
 
 
@@ -75,10 +77,41 @@ class WeatherConfig(BaseModel):
     """Nombre de creneaux de prevision a 3 h conserves (0 pour desactiver)."""
 
 
-class ObsConfig(BaseModel):
-    enabled: bool = True
+class BroadcasterConfig(BaseModel):
+    """Logiciel de diffusion interroge : OBS Studio ou Streamlabs Desktop.
+
+    Les deux ne parlent pas le meme protocole — obs-websocket d'un cote,
+    JSON-RPC de l'autre — d'ou le choix explicite plutot qu'une detection
+    automatique qui echouerait silencieusement.
+    """
+
+    kind: str = "obs"
+    """`obs`, `streamlabs`, ou `none` pour ne rien interroger."""
+
+    # --- OBS Studio ---
     url: str = "ws://127.0.0.1:4455"
     password: str = ""
+
+    # --- Streamlabs Desktop ---
+    token: str = ""
+    """Jeton de *Parametres > Remote Control*. Inutile sous Windows quand le
+    tube nomme est disponible."""
+
+    host: str = "127.0.0.1"
+    port: int = 59650
+    use_pipe: bool = True
+    """Prefere le tube nomme Windows au TCP : rien a activer cote Streamlabs."""
+
+
+class StreamlabsAlertsConfig(BaseModel):
+    """API socket de streamlabs.com : dons, follows, abonnements en direct."""
+
+    enabled: bool = True
+    socket_token: str = ""
+    """streamlabs.com > Parametres > API Settings > API Tokens > Socket API Token."""
+
+    keep_events: int = 8
+    """Nombre d'alertes conservees pour l'affichage."""
 
 
 class StreamConfig(BaseModel):
@@ -87,7 +120,8 @@ class StreamConfig(BaseModel):
     twitch_client_id: str = ""
     twitch_client_secret: str = ""
     twitch_login: str = ""
-    obs: ObsConfig = Field(default_factory=ObsConfig)
+    broadcaster: BroadcasterConfig = Field(default_factory=BroadcasterConfig)
+    streamlabs: StreamlabsAlertsConfig = Field(default_factory=StreamlabsAlertsConfig)
 
 
 class ChecklistConfig(BaseModel):

@@ -108,7 +108,8 @@ def create_app(config: Config | None = None) -> FastAPI:
             "name": "dashboard-engine",
             "api_version": API_VERSION,
             "endpoints": ["/api/state", "/api/music", "/api/servers", "/api/weather",
-                          "/api/stream", "/api/checklist", "/ws"],
+                          "/api/stream", "/api/donations",
+                          "/api/checklist", "/ws"],
         }
 
     @app.get("/api/health")
@@ -159,6 +160,10 @@ def create_app(config: Config | None = None) -> FastAPI:
     @app.get("/api/stream", dependencies=[guard])
     async def get_stream() -> dict:
         return hub.stream.payload.model_dump()
+
+    @app.get("/api/donations", dependencies=[guard])
+    async def get_donations() -> dict:
+        return hub.donations.payload.model_dump()
 
     # --- checklist --------------------------------------------------------
 

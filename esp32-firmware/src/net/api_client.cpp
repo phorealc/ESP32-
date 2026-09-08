@@ -67,13 +67,14 @@ void parse_stream(JsonObjectConst src, StreamState& out) {
   out.followers = src["followers"] | 0;
   out.uptime_s = src["uptime_s"] | 0;
 
-  JsonObjectConst obs = src["obs"];
-  out.obs.connected = obs["connected"] | false;
-  out.obs.streaming = obs["streaming"] | false;
-  out.obs.recording = obs["recording"] | false;
-  copy_text(out.obs.scene, sizeof(out.obs.scene), obs["scene"] | "");
-  out.obs.fps = obs["fps"] | 0.0f;
-  out.obs.dropped_frames_pct = obs["dropped_frames_pct"] | 0.0f;
+  JsonObjectConst broadcaster = src["broadcaster"];
+  copy_text(out.broadcaster.kind, sizeof(out.broadcaster.kind), broadcaster["kind"] | "");
+  out.broadcaster.connected = broadcaster["connected"] | false;
+  out.broadcaster.streaming = broadcaster["streaming"] | false;
+  out.broadcaster.recording = broadcaster["recording"] | false;
+  copy_text(out.broadcaster.scene, sizeof(out.broadcaster.scene), broadcaster["scene"] | "");
+  out.broadcaster.fps = broadcaster["fps"] | 0.0f;
+  out.broadcaster.dropped_frames_pct = broadcaster["dropped_frames_pct"] | 0.0f;
 }
 
 void parse_checklist(JsonObjectConst src, ChecklistState& out) {

@@ -16,7 +16,7 @@ token = "depuis-le-toml"
 name = "Survie"
 host = "mc.exemple.net"
 
-[stream.obs]
+[stream.broadcaster]
 url = "ws://192.168.1.5:4455"
 """
 
@@ -35,7 +35,7 @@ def test_load_toml(tmp_path: Path) -> None:
     assert config.server.port == 9000
     assert config.server.token == "depuis-le-toml"
     assert config.minecraft.servers[0].name == "Survie"
-    assert config.stream.obs.url == "ws://192.168.1.5:4455"
+    assert config.stream.broadcaster.url == "ws://192.168.1.5:4455"
     # Les chemins relatifs se resolvent a cote du fichier de configuration.
     assert config.checklist_path() == tmp_path / "checklist.json"
 
@@ -49,7 +49,7 @@ def test_env_overrides_win_over_toml() -> None:
 def test_env_overrides_create_missing_sections() -> None:
     data: dict = {}
     apply_env_overrides(data, {"DASHBOARD_OBS_PASSWORD": "secret"})
-    assert data == {"stream": {"obs": {"password": "secret"}}}
+    assert data == {"stream": {"broadcaster": {"password": "secret"}}}
 
 
 def test_empty_env_does_not_erase_toml_value() -> None:

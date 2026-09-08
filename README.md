@@ -169,6 +169,20 @@ curl http://127.0.0.1:8787/api/health
 | --- | --- | --- |
 | Vous lancez `npm run dev` sans sidecar | statut : « sidecar introuvable » | lancez `python -m dashboard_engine` a cote, ou construisez le sidecar (voir plus haut) |
 | Le moteur s'arrete au demarrage | statut : « le moteur s'est arrete » | la sortie du moteur est recopiee dans celle de l'application ; lancez l'app depuis un terminal pour la lire |
+
+### L'onglet Stream affiche « Streamlabs deconnecte »
+
+L'API de Streamlabs Desktop n'est pas versionnee : ses noms de champs peuvent
+changer d'une version a l'autre. Cette commande affiche ce que **votre**
+installation renvoie vraiment :
+
+```bash
+python -m dashboard_engine.diagnose streamlabs   # ou: obs
+```
+
+Si les services repondent mais que l'ecran reste vide, comparez les champs
+affiches a ceux que lit `build_state()` dans
+`engine/dashboard_engine/sources/streamlabs_desktop.py`.
 | Le port 8787 est deja pris | le moteur ecrit une erreur de bind | changez `[server].port` dans votre `config.toml` |
 | `config.toml` invalide | le moteur s'arrete aussitot | corrigez-le, ou supprimez-le : il sera recree depuis le modele |
 
@@ -202,7 +216,16 @@ n'ont rien a faire dans l'historique.
   (comptez ~10 min d'activation).
 - **Twitch** — application sur la [console developpeur](https://dev.twitch.tv/console/apps).
   Le flux `client_credentials` suffit : aucune connexion utilisateur.
-- **OBS** — *Outils > Parametres du serveur WebSocket*, dans OBS 28 ou superieur.
+- **Logiciel de diffusion** — `[stream.broadcaster].kind` vaut `streamlabs`,
+  `obs` ou `none`. Les deux logiciels remontent les memes informations par des
+  protocoles differents, d'ou le choix explicite.
+  - *Streamlabs Desktop* : rien a configurer sous Windows, le tube nomme
+    suffit. Sinon activez *Parametres > Remote Control* et copiez le jeton
+    dans `[stream.broadcaster].token`.
+  - *OBS Studio* : *Outils > Parametres du serveur WebSocket*, OBS 28 ou plus.
+- **Alertes Streamlabs** (dons, follows, abonnements) — streamlabs.com >
+  *Parametres > API Settings > API Tokens > Socket API Token*, a coller dans
+  `[stream.streamlabs].socket_token`. A traiter comme un mot de passe.
 - **Musique** — rien a configurer, mais **Windows uniquement** (API SMTC).
   Sous Linux/macOS le module se declare simplement indisponible.
 

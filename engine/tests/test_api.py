@@ -14,14 +14,14 @@ def test_health_lists_modules(client: TestClient) -> None:
     payload = client.get("/api/health").json()
     assert payload["ok"] is True
     assert payload["api_version"] == API_VERSION
-    assert set(payload["modules"]) == {"music", "servers", "weather", "stream"}
+    assert set(payload["modules"]) == {"music", "servers", "weather", "stream", "donations"}
     assert payload["modules"]["weather"]["available"] is False
 
 
 def test_state_shape(client: TestClient) -> None:
     payload = client.get("/api/state").json()
     assert payload["version"] == API_VERSION
-    assert set(payload) >= {"ts", "music", "servers", "weather", "stream", "checklist"}
+    assert set(payload) >= {"ts", "music", "servers", "weather", "stream", "donations", "checklist"}
     assert payload["checklist"]["items"][0]["label"] == "Lancer OBS"
     # Le contrat doit rester validable par le modele.
     DashboardState.model_validate(payload)
@@ -52,7 +52,7 @@ def test_slim_state_drops_motd_per_server() -> None:
 
 
 def test_per_module_endpoints(client: TestClient) -> None:
-    for path in ("/api/music", "/api/servers", "/api/weather", "/api/stream"):
+    for path in ("/api/music", "/api/servers", "/api/weather", "/api/stream", "/api/donations"):
         payload = client.get(path).json()
         assert payload["available"] is False
         assert payload["error"]  # explique pourquoi le module est muet

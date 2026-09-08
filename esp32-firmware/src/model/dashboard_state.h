@@ -61,7 +61,10 @@ struct WeatherState {
   float wind_kph = 0.0f;
 };
 
-struct ObsState {
+struct BroadcasterState {
+  // « obs » ou « streamlabs » : sert a nommer le logiciel a l'ecran, les deux
+  // remontant les memes informations par des protocoles differents.
+  char kind[LEN_SHORT] = "";
   bool connected = false;
   bool streaming = false;
   bool recording = false;
@@ -78,7 +81,7 @@ struct StreamState {
   int32_t viewers = 0;
   int32_t followers = 0;
   uint32_t uptime_s = 0;
-  ObsState obs;
+  BroadcasterState broadcaster;
 };
 
 struct ChecklistItem {

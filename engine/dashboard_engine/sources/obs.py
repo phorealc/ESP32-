@@ -16,8 +16,8 @@ import uuid
 
 import websockets
 
-from dashboard_engine.config import ObsConfig
-from dashboard_engine.models import ObsState
+from dashboard_engine.config import BroadcasterConfig
+from dashboard_engine.models import BroadcasterState
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def compute_auth(password: str, salt: str, challenge: str) -> str:
 class ObsClient:
     """Connexion persistante a OBS, reconnectee paresseusement a chaque cycle."""
 
-    def __init__(self, config: ObsConfig) -> None:
+    def __init__(self, config: BroadcasterConfig) -> None:
         self._config = config
         self._ws: websockets.WebSocketClientProtocol | None = None
         self._lock = asyncio.Lock()
@@ -110,7 +110,7 @@ class ObsClient:
                         raise RuntimeError(f"{request_type}: {status.get('comment', 'echec')}")
                     return payload.get("responseData") or {}
 
-    async def poll(self) -> ObsState:
+    async def poll(self) -> BroadcasterState:
         """Recupere l'etat d'OBS. Une deconnexion renvoie un etat non connecte."""
         try:
             stream = await self.request("GetStreamStatus")
@@ -120,11 +120,12 @@ class ObsClient:
         except Exception as exc:
             log.debug("OBS injoignable: %s", exc)
             self._ws = None
-            return ObsState(connected=False)
+            return BroadcasterState(kind="obs", connected=False)
 
         total = stream.get("outputTotalFrames") or 0
         skipped = stream.get("outputSkippedFrames") or 0
-        return ObsState(
+        return BroadcasterState(
+            kind="obs",
             connected=True,
             streaming=bool(stream.get("outputActive")),
             recording=bool(record.get("outputActive")),

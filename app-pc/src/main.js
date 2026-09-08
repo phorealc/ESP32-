@@ -156,11 +156,14 @@ function renderStream(stream) {
     ["A l'antenne", stream.live && stream.uptime_s > 0 ? fmtDuration(stream.uptime_s) : "—"],
   ]);
 
-  const obs = stream.obs ?? {};
+  const obs = stream.broadcaster ?? {};
+  // Nommer le vrai logiciel : « OBS deconnecte » chez un utilisateur de
+  // Streamlabs l'enverrait chercher au mauvais endroit.
+  const software = obs.kind === "streamlabs" ? "Streamlabs" : obs.kind === "obs" ? "OBS" : "Diffusion";
   setDot($("obs-dot"), obs.connected ? (obs.streaming ? "live" : "ok") : "");
   $("obs-text").textContent = obs.connected
-    ? `OBS · ${obs.scene || "sans scene"} · ${Math.round(obs.fps)} fps · ${obs.dropped_frames_pct.toFixed(1)} % perdues${obs.recording ? " · REC" : ""}`
-    : "OBS deconnecte";
+    ? `${software} · ${obs.scene || "sans scene"} · ${Math.round(obs.fps)} fps · ${(obs.dropped_frames_pct ?? 0).toFixed(1)} % perdues${obs.recording ? " · REC" : ""}`
+    : `${software} deconnecte`;
 }
 
 function renderStats(container, entries) {

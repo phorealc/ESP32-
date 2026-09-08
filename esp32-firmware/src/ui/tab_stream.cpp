@@ -1,6 +1,7 @@
 // Onglet Stream : etat Twitch et sante d'OBS.
 
 #include <stdio.h>
+#include <string.h>
 
 #include "tabs.h"
 #include "text_util.h"
@@ -127,21 +128,28 @@ void tab_stream_update(const DashboardState& state) {
   }
   label_set_text_if_changed(g_uptime, buffer);
 
-  const ObsState& obs = stream.obs;
+  const BroadcasterState& obs = stream.broadcaster;
+  // Le logiciel est nomme d'apres ce que le moteur annonce : afficher « OBS »
+  // a quelqu'un qui utilise Streamlabs le ferait chercher au mauvais endroit.
+  const char* software = strcmp(obs.kind, "streamlabs") == 0 ? "Streamlabs" : "OBS";
+
   lv_obj_set_style_bg_color(g_obs_dot, obs.connected ? (obs.streaming ? COLOR_ERROR : COLOR_OK)
                                                      : COLOR_MUTED,
                             LV_PART_MAIN);
 
   if (!obs.connected) {
-    label_set_text_if_changed(g_obs_text, "OBS deconnecte");
-    label_set_text_if_changed(g_obs_details, "Verifiez le serveur WebSocket dans OBS");
+    snprintf(buffer, sizeof(buffer), "%s deconnecte", software);
+    label_set_text_if_changed(g_obs_text, buffer);
+    label_set_text_if_changed(g_obs_details,
+                              obs.kind[0] == '\0' ? "Aucun logiciel de diffusion configure"
+                                                  : "Le logiciel de diffusion est-il lance ?");
     return;
   }
 
   char scene[LEN_LABEL];
   ascii_fold(scene, sizeof(scene), obs.scene);
-  snprintf(buffer, sizeof(buffer), "OBS · %s%s", scene[0] != '\0' ? scene : "sans scene",
-           obs.recording ? "  ·  REC" : "");
+  snprintf(buffer, sizeof(buffer), "%s · %s%s", software,
+           scene[0] != '\0' ? scene : "sans scene", obs.recording ? "  ·  REC" : "");
   label_set_text_if_changed(g_obs_text, buffer);
 
   snprintf(buffer, sizeof(buffer), "%.0f fps  ·  %.1f %% d'images perdues", obs.fps,

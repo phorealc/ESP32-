@@ -30,6 +30,7 @@ Ce n'est pas de l'authentification : le trafic reste en HTTP clair.
 | GET | `/api/servers` | bloc `servers` seul |
 | GET | `/api/weather` | bloc `weather` seul |
 | GET | `/api/stream` | bloc `stream` seul |
+| GET | `/api/donations` | alertes Streamlabs |
 | GET | `/api/checklist` | checklist seule |
 | WS | `/ws` | etat complet pousse toutes les 500 ms |
 
@@ -96,8 +97,20 @@ l'etat final reste celui voulu par l'utilisateur.
     "available": true, "error": null, "updated_at": 1757270400.0,
     "live": true, "title": "...", "game": "...",
     "viewers": 142, "followers": 3187, "uptime_s": 5430,
-    "obs": { "connected": true, "streaming": true, "recording": false,
-             "scene": "Ecran principal", "fps": 60.0, "dropped_frames_pct": 0.3 }
+    "broadcaster": { "kind": "streamlabs",   // "obs" | "streamlabs" | "none"
+                     "connected": true, "streaming": true, "recording": false,
+                     "scene": "Ecran principal", "fps": 60.0,
+                     "dropped_frames_pct": 0.3 }
+  },
+
+  "donations": {
+    "available": true, "error": null, "updated_at": 1757270400.0,
+    "total": 42.5,          // cumul depuis le demarrage du moteur, pas depuis toujours
+    "currency": "EUR",
+    "last_follower": "Bob",
+    "last_subscriber": "Carol",
+    "recent": [ { "kind": "donation", "name": "Alice", "amount": 5.0,
+                  "currency": "EUR", "message": "Continue !", "ts": 1757270390.0 } ]
   },
 
   "checklist": {
@@ -126,6 +139,7 @@ meteo connue au lieu de se vider a la premiere coupure reseau.
 | --- | --- |
 | tous | `error`, `updated_at` |
 | `music` | `album`, `app` |
+| `donations` | `recent` (les totaux suffisent a l'ESP32) |
 | `weather` | `forecast`, `temp_min_c`, `temp_max_c`, `sunrise`, `sunset` |
 | `servers.items[]` | `motd`, `error` |
 
@@ -133,6 +147,13 @@ La checklist n'est **jamais** tronquee : c'est la seule donnee que l'ESP32
 modifie, elle doit rester complete des deux cotes.
 
 ## Faire evoluer le contrat
+
+### Historique
+
+| Version | Changement |
+| --- | --- |
+| 2 | `stream.obs` devient `stream.broadcaster`, avec un champ `kind` (`obs` / `streamlabs` / `none`) : Streamlabs Desktop n'est pas OBS et ne parle pas son protocole. Ajout du bloc `donations`. |
+| 1 | Version initiale. |
 
 `version` (constante `API_VERSION` dans `engine/dashboard_engine/models.py`)
 identifie le contrat. Ajouter un champ ne casse aucun client : ArduinoJson et

@@ -11,7 +11,7 @@ import time
 
 from pydantic import BaseModel, Field
 
-API_VERSION = 1
+API_VERSION = 2
 
 
 class SourceMeta(BaseModel):
@@ -88,13 +88,49 @@ class Weather(SourceMeta):
     forecast: list[ForecastPoint] = Field(default_factory=list)
 
 
-class ObsState(BaseModel):
+class BroadcasterState(BaseModel):
+    """Etat du logiciel de diffusion : OBS Studio ou Streamlabs Desktop.
+
+    Les deux exposent les memes notions (scene, live, enregistrement, sante de
+    l'encodage) par des protocoles differents ; le dashboard n'a pas a savoir
+    lequel tourne, d'ou ce bloc commun.
+    """
+
+    kind: str = "none"
+    """`obs`, `streamlabs`, ou `none` si aucun n'est configure."""
+
     connected: bool = False
     streaming: bool = False
     recording: bool = False
     scene: str = ""
     fps: float = 0.0
     dropped_frames_pct: float = 0.0
+
+
+class DonationEvent(BaseModel):
+    """Un evenement d'alerte Streamlabs (don, follow, abonnement)."""
+
+    kind: str = "donation"
+    """`donation`, `follow`, `subscription`, `bits`, `host`, `raid`."""
+
+    name: str = ""
+    amount: float = 0.0
+    currency: str = ""
+    message: str = ""
+    ts: float = 0.0
+
+
+class Donations(SourceMeta):
+    """Alertes Streamlabs recentes, telles que poussees par leur API socket."""
+
+    total: float = 0.0
+    """Cumul des dons recus depuis le demarrage du moteur, pas depuis toujours :
+    l'API socket ne diffuse que les evenements en direct."""
+
+    currency: str = ""
+    recent: list[DonationEvent] = Field(default_factory=list)
+    last_follower: str = ""
+    last_subscriber: str = ""
 
 
 class Stream(SourceMeta):
@@ -104,7 +140,7 @@ class Stream(SourceMeta):
     viewers: int = 0
     followers: int = 0
     uptime_s: int = 0
-    obs: ObsState = Field(default_factory=ObsState)
+    broadcaster: BroadcasterState = Field(default_factory=BroadcasterState)
 
 
 class ChecklistItem(BaseModel):
@@ -131,4 +167,5 @@ class DashboardState(BaseModel):
     servers: Servers = Field(default_factory=Servers)
     weather: Weather = Field(default_factory=Weather)
     stream: Stream = Field(default_factory=Stream)
+    donations: Donations = Field(default_factory=Donations)
     checklist: Checklist = Field(default_factory=Checklist)

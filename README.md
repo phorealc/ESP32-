@@ -112,6 +112,33 @@ Le suffixe est le triplet de la cible (`rustc -Vv`), c'est ainsi que Tauri
 retrouve son sidecar. Le build doit tourner **sur Windows** : Tauri ne
 compile pas d'installeur Windows depuis Linux.
 
+## Depannage
+
+### « Connexion au moteur… » qui ne finit jamais
+
+L'interface tourne mais rien n'ecoute sur le port du moteur. Depuis la version
+qui suit ce probleme, la barre de statut affiche la **cause** au bout de
+quelques secondes plutot que de boucler en silence.
+
+Verifiez d'abord si le moteur repond :
+
+```powershell
+curl http://127.0.0.1:8787/api/health
+```
+
+| Cause | Signe | Remede |
+| --- | --- | --- |
+| Vous lancez `npm run dev` sans sidecar | statut : « sidecar introuvable » | lancez `python -m dashboard_engine` a cote, ou construisez le sidecar (voir plus haut) |
+| Le moteur s'arrete au demarrage | statut : « le moteur s'est arrete » | la sortie du moteur est recopiee dans celle de l'application ; lancez l'app depuis un terminal pour la lire |
+| Le port 8787 est deja pris | le moteur ecrit une erreur de bind | changez `[server].port` dans votre `config.toml` |
+| `config.toml` invalide | le moteur s'arrete aussitot | corrigez-le, ou supprimez-le : il sera recree depuis le modele |
+
+### Le moteur demarre mais toutes les cartes sont grisees
+
+C'est normal sans cles API : chaque carte indique sa raison
+(« cle API OpenWeatherMap manquante »...). Renseignez `config.toml`, puis
+relancez. `GET /api/health` liste l'etat de chaque module.
+
 ## Configuration
 
 Le `config.toml` cree au premier lancement (copie de

@@ -84,6 +84,51 @@ jobs:
         working-directory: app-pc
         run: npm run build
 
+      # Ce controle attrape la classe de bug la plus couteuse : l'application se
+      # lance, l'interface s'affiche, mais le moteur ne demarre jamais et
+      # l'ecran reste sur « connexion… ». Il faut lancer l'application pour le
+      # voir — construire ne suffit pas.
+      - name: Verifier que l'application demarre bien le moteur
+        shell: pwsh
+        run: |
+          $release = "app-pc/src-tauri/target/release"
+
+          # Tauri resout le sidecar dans le dossier de l'executable : s'il n'est
+          # pas la, le nom passe a `shell().sidecar()` est faux.
+          $sidecar = Join-Path $release "dashboard-engine.exe"
+          if (-not (Test-Path $sidecar)) {
+            Get-ChildItem $release -Filter *.exe | ForEach-Object { Write-Host "present: $($_.Name)" }
+            throw "sidecar absent a cote de l'executable : $sidecar"
+          }
+          Write-Host "sidecar bien place : $sidecar"
+
+          $app = Get-ChildItem $release -Filter *.exe |
+                 Where-Object { $_.Name -ne "dashboard-engine.exe" } |
+                 Select-Object -First 1
+          if (-not $app) { throw "executable de l'application introuvable dans $release" }
+          Write-Host "lancement de $($app.Name)"
+
+          $out = Join-Path $env:RUNNER_TEMP "app-stdout.log"
+          $proc = Start-Process -FilePath $app.FullName -PassThru `
+                    -RedirectStandardOutput $out -RedirectStandardError "$out.err"
+          try {
+            $health = $null
+            foreach ($attempt in 1..40) {
+              Start-Sleep -Milliseconds 750
+              try { $health = Invoke-RestMethod "http://127.0.0.1:8787/api/health" -TimeoutSec 3 } catch { }
+              if ($health -and $health.ok) { break }
+            }
+            if (-not ($health -and $health.ok)) {
+              Write-Host "--- sortie de l'application ---"
+              Get-Content $out, "$out.err" -ErrorAction SilentlyContinue | Write-Host
+              throw "l'application n'a pas demarre le moteur (rien sur 127.0.0.1:8787)"
+            }
+            Write-Host "le moteur repond — l'application le lance correctement"
+          } finally {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            Get-Process dashboard-engine -ErrorAction SilentlyContinue | Stop-Process -Force
+          }
+
       - name: Publier les installeurs en artefact
         uses: actions/upload-artifact@v4
         with:

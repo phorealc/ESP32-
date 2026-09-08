@@ -27,13 +27,21 @@
       "id": "main",
       "iconPath": "icons/icon.png",
       "tooltip": "Dashboard Phorealc"
-    }
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/256x256.png", "icons/icon.ico"],
-    "externalBin": ["binaries/dashboard-engine"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/dashboard-engine"
+    ],
     "resources": []
   }
 }

@@ -7,15 +7,23 @@
 const DEFAULT_ENGINE_URL = "http://127.0.0.1:8787";
 const RECONNECT_DELAY_MS = 2000;
 
-/** Resout l'URL du moteur : commande Tauri si disponible, sinon valeur par defaut. */
-async function resolveEngineUrl() {
+// Le moteur est un binaire PyInstaller : son demarrage prend quelques secondes.
+// On ne parle d'echec qu'apres plusieurs tentatives, sinon on alarmerait pour
+// un simple demarrage a froid.
+const ATTEMPTS_BEFORE_DIAGNOSIS = 4;
+
+/** Appelle une commande Rust, ou renvoie `null` hors contexte Tauri. */
+async function callTauri(command) {
   try {
-    const { invoke } = window.__TAURI__.core;
-    return await invoke("engine_url");
+    return await window.__TAURI__.core.invoke(command);
   } catch {
-    // Ouvert dans un simple navigateur (developpement du CSS, par exemple).
-    return DEFAULT_ENGINE_URL;
+    // Page ouverte dans un simple navigateur (developpement du CSS).
+    return null;
   }
+}
+
+async function resolveEngineUrl() {
+  return (await callTauri("engine_url")) ?? DEFAULT_ENGINE_URL;
 }
 
 const $ = (id) => document.getElementById(id);
@@ -38,7 +46,7 @@ const setDot = (element, variant) => {
 
 // --- rendu ----------------------------------------------------------------
 
-function renderLink(status) {
+function renderLink(status, detail = "") {
   const map = {
     connected: ["ok", "Moteur connecte"],
     connecting: ["warn", "Connexion au moteur…"],
@@ -46,7 +54,8 @@ function renderLink(status) {
   };
   const [variant, text] = map[status] ?? map.connecting;
   setDot($("link-dot"), variant);
-  $("link-text").textContent = text;
+  $("link-text").textContent = detail ? `${text} — ${detail}` : text;
+  $("link").title = detail;
 }
 
 function renderMusic(music) {
@@ -279,11 +288,27 @@ async function main() {
 
   // Reconnexion perpetuelle : le moteur peut redemarrer sans que l'utilisateur
   // ait a relancer la coquille.
+  let attempts = 0;
+
+  /** Explique *pourquoi* rien n'arrive, plutot que de boucler en silence. */
+  const diagnose = async () => {
+    if (attempts < ATTEMPTS_BEFORE_DIAGNOSIS) return "";
+    const status = await callTauri("engine_status");
+    if (status && !status.spawned) return status.detail;
+    if (status) return `aucune reponse sur ${engineUrl}`;
+    // Hors Tauri : c'est un moteur lance a la main qui manque.
+    return `aucune reponse sur ${engineUrl} — le moteur est-il lance ?`;
+  };
+
   const connect = () => {
+    attempts += 1;
     renderLink("connecting");
     const socket = new WebSocket(wsUrl);
 
-    socket.addEventListener("open", () => renderLink("connected"));
+    socket.addEventListener("open", () => {
+      attempts = 0;
+      renderLink("connected");
+    });
     socket.addEventListener("message", (event) => {
       try {
         render(JSON.parse(event.data));
@@ -291,8 +316,8 @@ async function main() {
         console.warn("payload illisible", error);
       }
     });
-    socket.addEventListener("close", () => {
-      renderLink("offline");
+    socket.addEventListener("close", async () => {
+      renderLink("offline", await diagnose());
       setTimeout(connect, RECONNECT_DELAY_MS);
     });
     socket.addEventListener("error", () => socket.close());

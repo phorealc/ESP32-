@@ -11,15 +11,53 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager, RunEvent, State, WindowEvent,
 };
-use tauri_plugin_shell::process::CommandChild;
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
-/// Nom du binaire sidecar, tel que declare dans `tauri.conf.json`.
-const ENGINE_SIDECAR: &str = "binaries/dashboard-engine";
+/// Nom du sidecar.
+///
+/// C'est bien le nom **sans chemin**, meme si `tauri.conf.json` declare
+/// `binaries/dashboard-engine` : ce dernier designe l'emplacement dans les
+/// sources, alors qu'a l'execution Tauri resout le sidecar dans le dossier de
+/// l'executable (`relative_command_path` fait `dossier_exe.join(nom)`).
+/// Passer le chemin complet ferait chercher `<install>/binaries/...`, qui
+/// n'existe pas — et le moteur ne demarrerait jamais.
+const ENGINE_SIDECAR: &str = "dashboard-engine";
 
-/// Poignee sur le processus moteur, pour pouvoir le terminer proprement.
+/// Etat du moteur, expose au frontend pour qu'il puisse expliquer une panne
+/// au lieu d'afficher « connexion… » indefiniment.
+#[derive(Clone, serde::Serialize)]
+struct EngineStatus {
+    /// True si le processus sidecar a bien demarre.
+    spawned: bool,
+    /// Message lisible : cause de l'echec, ou mode de fonctionnement.
+    detail: String,
+}
+
+impl Default for EngineStatus {
+    fn default() -> Self {
+        Self {
+            spawned: false,
+            detail: "demarrage en cours".into(),
+        }
+    }
+}
+
 #[derive(Default)]
-struct EngineProcess(Mutex<Option<CommandChild>>);
+struct Engine {
+    child: Mutex<Option<CommandChild>>,
+    status: Mutex<EngineStatus>,
+}
+
+impl Engine {
+    fn set_status(&self, spawned: bool, detail: impl Into<String>) {
+        let detail = detail.into();
+        log_line(&detail);
+        if let Ok(mut guard) = self.status.lock() {
+            *guard = EngineStatus { spawned, detail };
+        }
+    }
+}
 
 /// Adresse du moteur, exposee au frontend pour eviter de la coder en dur en JS.
 #[tauri::command]
@@ -29,9 +67,18 @@ fn engine_url() -> String {
     std::env::var("DASHBOARD_ENGINE_URL").unwrap_or_else(|_| "http://127.0.0.1:8787".into())
 }
 
+#[tauri::command]
+fn engine_status(engine: State<'_, Engine>) -> EngineStatus {
+    engine
+        .status
+        .lock()
+        .map(|status| status.clone())
+        .unwrap_or_default()
+}
+
 /// Arrete le moteur. Idempotent : appele a la fermeture et au quit du tray.
-fn stop_engine(state: &EngineProcess) {
-    if let Ok(mut guard) = state.0.lock() {
+fn stop_engine(engine: &Engine) {
+    if let Ok(mut guard) = engine.child.lock() {
         if let Some(child) = guard.take() {
             let _ = child.kill();
         }
@@ -42,25 +89,64 @@ fn stop_engine(state: &EngineProcess) {
 /// deja faire tourner `python -m dashboard_engine` a la main, auquel cas
 /// l'interface se connectera au moteur existant.
 fn start_engine(app: &tauri::AppHandle) {
-    let state = app.state::<EngineProcess>();
-    if state.0.lock().map(|g| g.is_some()).unwrap_or(false) {
+    let engine = app.state::<Engine>();
+    if engine.child.lock().map(|g| g.is_some()).unwrap_or(false) {
         return;
     }
 
-    match app.shell().sidecar(ENGINE_SIDECAR) {
-        Ok(command) => match command.spawn() {
-            Ok((_rx, child)) => {
-                if let Ok(mut guard) = state.0.lock() {
-                    *guard = Some(child);
-                }
-                log_line("moteur demarre en sidecar");
+    let command = match app.shell().sidecar(ENGINE_SIDECAR) {
+        Ok(command) => command,
+        Err(error) => {
+            engine.set_status(
+                false,
+                format!("sidecar « {ENGINE_SIDECAR} » introuvable ({error}) — la coquille se rabat sur un moteur lance a la main"),
+            );
+            return;
+        }
+    };
+
+    match command.spawn() {
+        Ok((receiver, child)) => {
+            if let Ok(mut guard) = engine.child.lock() {
+                *guard = Some(child);
             }
-            Err(error) => log_line(&format!("echec du demarrage du moteur: {error}")),
-        },
-        Err(error) => log_line(&format!(
-            "sidecar introuvable ({error}) — la coquille se rabattra sur un moteur deja lance"
-        )),
+            engine.set_status(true, "moteur demarre en sidecar");
+            forward_engine_output(app.clone(), receiver);
+        }
+        Err(error) => engine.set_status(false, format!("echec du demarrage du moteur : {error}")),
     }
+}
+
+/// Recopie la sortie du moteur dans celle de la coquille.
+///
+/// Sans ca, un moteur qui s'arrete au demarrage (configuration illisible, port
+/// occupe) le fait en silence : l'interface reste sur « connexion… » sans que
+/// rien n'explique pourquoi.
+fn forward_engine_output(
+    app: tauri::AppHandle,
+    mut receiver: tauri::async_runtime::Receiver<CommandEvent>,
+) {
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = receiver.recv().await {
+            match event {
+                CommandEvent::Stdout(line) | CommandEvent::Stderr(line) => {
+                    log_line(&format!("moteur: {}", String::from_utf8_lossy(&line).trim_end()));
+                }
+                CommandEvent::Error(error) => {
+                    app.state::<Engine>()
+                        .set_status(false, format!("erreur du moteur : {error}"));
+                }
+                CommandEvent::Terminated(payload) => {
+                    app.state::<Engine>().set_status(
+                        false,
+                        format!("le moteur s'est arrete (code {:?})", payload.code),
+                    );
+                    break;
+                }
+                _ => {}
+            }
+        }
+    });
 }
 
 fn log_line(message: &str) {
@@ -77,8 +163,7 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         tray = tray.icon(icon);
     }
 
-    tray
-        .menu(&menu)
+    tray.menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => {
@@ -88,7 +173,7 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                 }
             }
             "quit" => {
-                stop_engine(&app.state::<EngineProcess>());
+                stop_engine(&app.state::<Engine>());
                 app.exit(0);
             }
             _ => {}
@@ -105,8 +190,8 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .manage(EngineProcess::default())
-        .invoke_handler(tauri::generate_handler![engine_url])
+        .manage(Engine::default())
+        .invoke_handler(tauri::generate_handler![engine_url, engine_status])
         .setup(|app| {
             start_engine(app.handle());
             build_tray(app.handle())?;
@@ -124,7 +209,7 @@ pub fn run() {
         .expect("erreur au demarrage de Tauri")
         .run(|app, event| {
             if let RunEvent::ExitRequested { .. } | RunEvent::Exit = event {
-                stop_engine(&app.state::<EngineProcess>());
+                stop_engine(&app.state::<Engine>());
             }
         });
 }

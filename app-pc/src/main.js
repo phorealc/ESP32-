@@ -22,6 +22,43 @@ async function callTauri(command) {
   }
 }
 
+/** Bandeau de mise a jour : propose, sans jamais interrompre le dashboard. */
+function setupUpdates() {
+  const bar = $("update-bar");
+  const text = $("update-text");
+
+  const show = (info) => {
+    text.textContent = `Version ${info.version} disponible (vous avez la ${info.current_version}).`;
+    bar.hidden = false;
+  };
+
+  $("update-dismiss").addEventListener("click", () => {
+    bar.hidden = true;
+  });
+
+  $("update-install").addEventListener("click", async () => {
+    bar.classList.add("busy");
+    text.textContent = "Telechargement de la mise a jour…";
+    try {
+      // Sous Windows, l'application se ferme d'elle-meme pour laisser la main
+      // a l'installeur : si on revient ici, c'est que ca a echoue.
+      await window.__TAURI__.core.invoke("install_update");
+    } catch (error) {
+      text.textContent = `Mise a jour impossible : ${error}`;
+      bar.classList.remove("busy");
+    }
+  });
+
+  // Le Rust previent au demarrage ; on interroge aussi une fois, au cas ou
+  // l'evenement serait parti avant que la page ne soit prete.
+  window.__TAURI__?.event
+    ?.listen("update-available", (event) => show(event.payload))
+    .catch(() => {});
+  callTauri("check_update").then((info) => {
+    if (info) show(info);
+  });
+}
+
 async function resolveEngineUrl() {
   return (await callTauri("engine_url")) ?? DEFAULT_ENGINE_URL;
 }
@@ -237,6 +274,7 @@ function renderChecklist(checklist, actions) {
 // --- liaison au moteur -----------------------------------------------------
 
 async function main() {
+  setupUpdates();
   const engineUrl = await resolveEngineUrl();
   const wsUrl = `${engineUrl.replace(/^http/, "ws")}/ws`;
 

@@ -42,6 +42,18 @@
     "externalBin": [
       "binaries/dashboard-engine"
     ],
-    "resources": []
+    "resources": [],
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/phorealc/ESP32-/releases/latest/download/latest.json"
+      ],
+      "pubkey": "",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

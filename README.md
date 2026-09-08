@@ -98,6 +98,45 @@ en brouillon.
 L'onglet **Actions → Release → Run workflow** lance la meme chaine sans tag :
 les installeurs sortent alors en artefact de build, pratique pour tester.
 
+### Mise a jour automatique
+
+L'application verifie au demarrage s'il existe une version plus recente et
+propose un bandeau « Installer et redemarrer ». Les mises a jour sont
+**signees** : sans signature valide, l'application refuse de les installer.
+
+Cette signature demande une paire de cles, a creer **une seule fois**. Je ne
+peux pas la generer a votre place : la cle privee ne doit exister que chez vous
+et dans les secrets du depot.
+
+```bash
+cd app-pc
+npm install
+npm run tauri signer generate -- -w ~/.tauri/dashboard.key
+```
+
+La commande affiche une **cle publique** et ecrit la **cle privee** dans le
+fichier indique. Ensuite :
+
+1. Collez la cle publique dans `app-pc/src-tauri/tauri.conf.json`,
+   `plugins.updater.pubkey`.
+2. Dans le depot GitHub, *Settings → Secrets and variables → Actions*, creez :
+   - `TAURI_SIGNING_PRIVATE_KEY` — le **contenu** du fichier `~/.tauri/dashboard.key` ;
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — le mot de passe choisi (secret vide si aucun).
+3. Committez le `tauri.conf.json` modifie.
+
+Tant que ces secrets sont absents, la release se construit quand meme : elle
+produit un installeur normal, sans mise a jour automatique, et le workflow
+l'annonce par un avertissement.
+
+**Sauvegardez la cle privee.** Elle est perdue, toutes les futures mises a jour
+le sont aussi : les applications deja installees refuseront un manifeste signe
+par une autre cle, et vos utilisateurs devront reinstaller a la main.
+
+Le mecanisme : chaque release publie un `latest.json` qui decrit la derniere
+version et l'URL de son installeur. L'application interroge
+`releases/latest/download/latest.json`, verifie la signature, telecharge, puis
+laisse l'installeur prendre la main.
+
 ### Construire en local (sur Windows)
 
 ```powershell

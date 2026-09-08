@@ -339,3 +339,21 @@ button:hover { border-color: var(--accent); }
 .ghost:hover { color: var(--text); }
 
 .empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+
+/* --- bandeau de mise a jour --- */
+
+.update-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), var(--surface));
+  border-bottom: 1px solid var(--accent);
+  font-size: 13px;
+}
+
+.update-bar #update-text { flex: 1; min-width: 0; }
+
+.update-bar button { padding: 6px 12px; font-size: 13px; }
+.update-bar button#update-install { border-color: var(--accent); }
+.update-bar.busy button { opacity: 0.6; pointer-events: none; }

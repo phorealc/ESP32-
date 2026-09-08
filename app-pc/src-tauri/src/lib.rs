@@ -9,10 +9,11 @@ use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager, RunEvent, State, WindowEvent,
+    Emitter, Manager, RunEvent, State, WindowEvent,
 };
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_updater::UpdaterExt;
 
 /// Nom du sidecar.
 ///
@@ -149,6 +150,69 @@ fn forward_engine_output(
     });
 }
 
+
+// --- mise a jour automatique ---------------------------------------------
+
+/// Description d'une mise a jour disponible, envoyee au frontend.
+#[derive(Clone, serde::Serialize)]
+struct UpdateInfo {
+    version: String,
+    current_version: String,
+    notes: String,
+}
+
+/// Cherche une mise a jour. `Ok(None)` = deja a jour.
+///
+/// Une erreur ici n'a rien de dramatique (pas de reseau, cle de signature non
+/// configuree) : on la remonte au frontend, qui reste silencieux.
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    let update = updater.check().await.map_err(|error| error.to_string())?;
+    Ok(update.map(|update| UpdateInfo {
+        version: update.version.clone(),
+        current_version: update.current_version.clone(),
+        notes: update.body.clone().unwrap_or_default(),
+    }))
+}
+
+/// Telecharge et installe la mise a jour.
+///
+/// Sous Windows, Tauri lance l'installeur puis quitte l'application : cette
+/// fonction ne rend donc pas la main en cas de succes.
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "aucune mise a jour disponible".to_string())?;
+
+    log_line(&format!("installation de la version {}", update.version));
+    // Le moteur doit liberer son port avant que l'installeur ne remplace les
+    // fichiers, sinon la nouvelle version trouve le port 8787 occupe.
+    stop_engine(&app.state::<Engine>());
+    update
+        .download_and_install(|_chunk, _total| {}, || {})
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Verifie les mises a jour au demarrage et previent le frontend s'il y en a une.
+fn check_update_on_startup(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        match check_update(app.clone()).await {
+            Ok(Some(info)) => {
+                log_line(&format!("mise a jour disponible : {}", info.version));
+                let _ = app.emit("update-available", info);
+            }
+            Ok(None) => log_line("application a jour"),
+            Err(error) => log_line(&format!("verification des mises a jour impossible : {error}")),
+        }
+    });
+}
+
 fn log_line(message: &str) {
     println!("[dashboard-pc] {message}");
 }
@@ -186,15 +250,22 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
         .manage(Engine::default())
-        .invoke_handler(tauri::generate_handler![engine_url, engine_status])
+        .invoke_handler(tauri::generate_handler![
+            engine_url,
+            engine_status,
+            check_update,
+            install_update
+        ])
         .setup(|app| {
             start_engine(app.handle());
             build_tray(app.handle())?;
+            check_update_on_startup(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {

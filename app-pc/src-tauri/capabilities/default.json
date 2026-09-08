@@ -2,14 +2,22 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Permissions de la fenetre principale : elle ne parle qu'au moteur local.",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
     "shell:allow-execute",
     {
       "identifier": "shell:allow-spawn",
-      "allow": [{ "name": "binaries/dashboard-engine", "sidecar": true }]
-    }
+      "allow": [
+        {
+          "name": "binaries/dashboard-engine",
+          "sidecar": true
+        }
+      ]
+    },
+    "updater:default"
   ]
 }

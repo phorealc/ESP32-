@@ -11,15 +11,23 @@ import contextlib
 import logging
 import time
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from starlette.websockets import WebSocketDisconnect
 
-from dashboard_engine.config import Config, load_config
+from dashboard_engine.config import DEFAULT_CONFIG_NAME, Config, load_config
+from dashboard_engine.configio import (
+    EDITABLE_SECTIONS,
+    editable_view,
+    mask_config,
+    merge_config,
+    write_config,
+)
 from dashboard_engine.hub import Hub, slim_state
 from dashboard_engine.models import API_VERSION, Checklist
 from dashboard_engine.sources.music import MusicSource, MusicUnavailable
@@ -31,6 +39,11 @@ WS_PUSH_INTERVAL_S = 0.5
 progression fluide, assez lente pour rester negligeable en CPU."""
 
 TOKEN_HEADER = "X-Dashboard-Token"
+
+LOCAL_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+"""Le moteur ecoute sur tout le reseau local pour que l'ESP32 le joigne. Ecrire
+la configuration depuis un autre appareil n'a en revanche aucune raison d'etre,
+et permettrait de changer le jeton partage."""
 
 
 # --- corps de requetes ----------------------------------------------------
@@ -84,6 +97,14 @@ def create_app(config: Config | None = None) -> FastAPI:
     )
     app.state.hub = hub
     app.state.config = config
+
+    def current_config_path() -> Path:
+        """Fichier ou ecrire. La checklist vit a cote, donc son dossier fait foi.
+
+        Le chemin est resolu : l'ecran de reglages l'affiche pour que
+        l'utilisateur retrouve le fichier, un chemin relatif n'y aiderait pas.
+        """
+        return (hub.config.base_dir / DEFAULT_CONFIG_NAME).resolve()
 
     if config.server.cors_origins:
         app.add_middleware(
@@ -199,6 +220,69 @@ def create_app(config: Config | None = None) -> FastAPI:
     @app.get("/api/donations", dependencies=[guard])
     async def get_donations() -> dict:
         return hub.donations.payload.model_dump()
+
+    # --- configuration ----------------------------------------------------
+
+    def require_local(request: Request) -> None:
+        """Refuse les ecritures venues d'ailleurs que de cette machine."""
+        host = request.client.host if request.client else ""
+        if host not in LOCAL_HOSTS:
+            raise HTTPException(
+                status_code=403,
+                detail="la configuration ne se modifie que depuis le PC qui heberge le moteur",
+            )
+
+    @app.get("/api/config", dependencies=[guard])
+    async def get_config() -> dict:
+        """Configuration modifiable, secrets masques.
+
+        Les valeurs masquees permettent a l'interface de montrer qu'une cle est
+        en place sans jamais la reveler — y compris a un appareil du reseau.
+        """
+        data = mask_config(editable_view(hub.config.model_dump(mode="json")))
+        path = current_config_path()
+        return {
+            **data,
+            "_meta": {
+                "path": str(path),
+                "exists": path.is_file(),
+                "checklist_path": str(hub.config.checklist_path()),
+            },
+        }
+
+    @app.patch("/api/config", dependencies=[guard, Depends(require_local)])
+    async def patch_config(patch: dict) -> dict:
+        """Enregistre des reglages et les applique sans redemarrer.
+
+        Le corps est un fragment : seules les cles fournies sont modifiees, et
+        une valeur masquee laisse le secret existant en place.
+        """
+        unknown = set(patch) - set(EDITABLE_SECTIONS)
+        if unknown:
+            raise HTTPException(
+                status_code=400, detail=f"sections non modifiables: {', '.join(sorted(unknown))}"
+            )
+
+        merged = merge_config(hub.config.model_dump(mode="json"), patch)
+        try:
+            new_config = Config.model_validate(merged)
+        except ValidationError as exc:
+            # On refuse avant d'ecrire : un fichier invalide empecherait le
+            # moteur de redemarrer, et l'ecran de reglages avec lui.
+            raise HTTPException(status_code=422, detail=exc.errors(include_url=False)) from None
+
+        path = current_config_path()
+        new_config.base_dir = path.parent
+        try:
+            write_config(path, merged)
+        except OSError as exc:
+            raise HTTPException(
+                status_code=500, detail=f"ecriture impossible dans {path}: {exc}"
+            ) from None
+
+        await hub.reload(new_config)
+        log.info("configuration enregistree dans %s", path)
+        return await get_config()
 
     # --- checklist --------------------------------------------------------
 

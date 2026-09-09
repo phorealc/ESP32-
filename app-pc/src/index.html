@@ -14,6 +14,7 @@
         <span class="brand-name">PHOREALC</span>
         <span class="brand-sub">Dashboard</span>
       </div>
+      <button class="ghost settings-open" id="settings-open" type="button">Reglages</button>
       <div class="link" id="link">
         <span class="dot" id="link-dot"></span>
         <span id="link-text">Connexion au moteur…</span>
@@ -85,6 +86,74 @@
         </form>
       </section>
     </main>
+
+    <dialog class="settings" id="settings">
+      <form method="dialog" class="settings-head">
+        <h2>Reglages</h2>
+        <button class="ghost" value="close">Fermer</button>
+      </form>
+
+      <p class="settings-path" id="settings-path"></p>
+
+      <div class="settings-body">
+        <section>
+          <h3>Meteo</h3>
+          <label><span>Cle API OpenWeatherMap</span>
+            <input id="cfg-weather-key" type="text" autocomplete="off" spellcheck="false"
+                   placeholder="home.openweathermap.org/api_keys" /></label>
+          <label><span>Ville</span>
+            <input id="cfg-weather-city" type="text" placeholder="Paris,FR" /></label>
+          <label class="check"><input id="cfg-weather-enabled" type="checkbox" /><span>Activer la meteo</span></label>
+        </section>
+
+        <section>
+          <h3>Serveurs Minecraft</h3>
+          <p class="hint">Six au maximum s'affichent sur l'ecran. Le port est optionnel (25565 par defaut).</p>
+          <div id="cfg-servers"></div>
+          <button class="ghost" id="cfg-add-server" type="button">+ Ajouter un serveur</button>
+          <label class="check"><input id="cfg-minecraft-enabled" type="checkbox" /><span>Activer les serveurs</span></label>
+        </section>
+
+        <section>
+          <h3>Diffusion</h3>
+          <label><span>Logiciel</span>
+            <select id="cfg-broadcaster-kind">
+              <option value="streamlabs">Streamlabs Desktop</option>
+              <option value="obs">OBS Studio</option>
+              <option value="none">Aucun</option>
+            </select></label>
+          <label data-kind="streamlabs"><span>Jeton Remote Control <em>(seulement si la detection auto echoue)</em></span>
+            <input id="cfg-broadcaster-token" type="text" autocomplete="off" spellcheck="false" /></label>
+          <label data-kind="obs"><span>Adresse obs-websocket</span>
+            <input id="cfg-broadcaster-url" type="text" placeholder="ws://127.0.0.1:4455" /></label>
+          <label data-kind="obs"><span>Mot de passe obs-websocket</span>
+            <input id="cfg-broadcaster-password" type="password" autocomplete="off" /></label>
+        </section>
+
+        <section>
+          <h3>Alertes Streamlabs</h3>
+          <p class="hint">streamlabs.com &rsaquo; Settings &rsaquo; API Settings &rsaquo; API Tokens &rsaquo; Socket API Token</p>
+          <label><span>Socket API Token</span>
+            <input id="cfg-streamlabs-token" type="text" autocomplete="off" spellcheck="false" /></label>
+        </section>
+
+        <section>
+          <h3>Twitch</h3>
+          <p class="hint">dev.twitch.tv &rsaquo; Console &rsaquo; Applications</p>
+          <label><span>Nom de la chaine</span>
+            <input id="cfg-twitch-login" type="text" placeholder="phorealc" /></label>
+          <label><span>Client ID</span>
+            <input id="cfg-twitch-id" type="text" autocomplete="off" spellcheck="false" /></label>
+          <label><span>Client Secret</span>
+            <input id="cfg-twitch-secret" type="text" autocomplete="off" spellcheck="false" /></label>
+        </section>
+      </div>
+
+      <div class="settings-foot">
+        <span class="settings-status" id="settings-status"></span>
+        <button id="settings-save" type="button">Enregistrer</button>
+      </div>
+    </dialog>
 
     <script type="module" src="main.js"></script>
   </body>

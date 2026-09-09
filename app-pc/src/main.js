@@ -292,6 +292,150 @@ function renderChecklist(checklist, actions) {
 
 // --- liaison au moteur -----------------------------------------------------
 
+
+// --- ecran de reglages -----------------------------------------------------
+
+/** Construit une ligne de serveur Minecraft. */
+function serverRow(server = {}) {
+  const row = document.createElement("div");
+  row.className = "server-row";
+
+  const name = document.createElement("input");
+  name.type = "text";
+  name.placeholder = "Nom affiche";
+  name.value = server.name ?? "";
+
+  const host = document.createElement("input");
+  host.type = "text";
+  host.placeholder = "mc.exemple.net";
+  host.value = server.host ?? "";
+
+  const bedrockLabel = document.createElement("label");
+  bedrockLabel.className = "bedrock";
+  const bedrock = document.createElement("input");
+  bedrock.type = "checkbox";
+  bedrock.checked = Boolean(server.bedrock);
+  bedrockLabel.append(bedrock, document.createTextNode("Bedrock"));
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "remove";
+  remove.textContent = "\u00D7";
+  remove.title = "Retirer ce serveur";
+  remove.addEventListener("click", () => row.remove());
+
+  row.append(name, host, bedrockLabel, remove);
+  row._read = () => ({
+    name: name.value.trim(),
+    host: host.value.trim(),
+    bedrock: bedrock.checked,
+  });
+  return row;
+}
+
+function setupSettings(engineUrl, post) {
+  const dialog = $("settings");
+  const status = $("settings-status");
+  const servers = $("cfg-servers");
+
+  const say = (message, kind = "") => {
+    status.textContent = message;
+    status.className = `settings-status${kind ? ` ${kind}` : ""}`;
+  };
+
+  const syncBroadcasterKind = () => {
+    dialog.dataset.kind = $("cfg-broadcaster-kind").value;
+  };
+  $("cfg-broadcaster-kind").addEventListener("change", syncBroadcasterKind);
+
+  $("cfg-add-server").addEventListener("click", () => servers.append(serverRow()));
+
+  const fill = (config) => {
+    $("settings-path").textContent = `Fichier : ${config._meta?.path ?? "inconnu"}`;
+
+    $("cfg-weather-key").value = config.weather?.api_key ?? "";
+    $("cfg-weather-city").value = config.weather?.city ?? "";
+    $("cfg-weather-enabled").checked = Boolean(config.weather?.enabled);
+
+    $("cfg-minecraft-enabled").checked = Boolean(config.minecraft?.enabled);
+    servers.replaceChildren(...(config.minecraft?.servers ?? []).map(serverRow));
+
+    const broadcaster = config.stream?.broadcaster ?? {};
+    $("cfg-broadcaster-kind").value = broadcaster.kind ?? "streamlabs";
+    $("cfg-broadcaster-token").value = broadcaster.token ?? "";
+    $("cfg-broadcaster-url").value = broadcaster.url ?? "";
+    $("cfg-broadcaster-password").value = broadcaster.password ?? "";
+    syncBroadcasterKind();
+
+    $("cfg-streamlabs-token").value = config.stream?.streamlabs?.socket_token ?? "";
+    $("cfg-twitch-login").value = config.stream?.twitch_login ?? "";
+    $("cfg-twitch-id").value = config.stream?.twitch_client_id ?? "";
+    $("cfg-twitch-secret").value = config.stream?.twitch_client_secret ?? "";
+  };
+
+  $("settings-open").addEventListener("click", async () => {
+    say("");
+    try {
+      const response = await fetch(`${engineUrl}/api/config`);
+      if (!response.ok) throw new Error(`le moteur a repondu ${response.status}`);
+      fill(await response.json());
+      dialog.showModal();
+    } catch (error) {
+      say(`Reglages illisibles : ${error.message}`, "error");
+      dialog.showModal();
+    }
+  });
+
+  $("settings-save").addEventListener("click", async () => {
+    // Les champs secrets renvoyes tels quels sont masques : le moteur les
+    // reconnait et laisse la valeur existante en place.
+    const patch = {
+      weather: {
+        enabled: $("cfg-weather-enabled").checked,
+        api_key: $("cfg-weather-key").value.trim(),
+        city: $("cfg-weather-city").value.trim(),
+      },
+      minecraft: {
+        enabled: $("cfg-minecraft-enabled").checked,
+        servers: [...servers.children]
+          .map((row) => row._read())
+          .filter((server) => server.name && server.host),
+      },
+      stream: {
+        twitch_login: $("cfg-twitch-login").value.trim(),
+        twitch_client_id: $("cfg-twitch-id").value.trim(),
+        twitch_client_secret: $("cfg-twitch-secret").value.trim(),
+        broadcaster: {
+          kind: $("cfg-broadcaster-kind").value,
+          token: $("cfg-broadcaster-token").value.trim(),
+          url: $("cfg-broadcaster-url").value.trim(),
+          password: $("cfg-broadcaster-password").value,
+        },
+        streamlabs: { socket_token: $("cfg-streamlabs-token").value.trim() },
+      },
+    };
+
+    say("Enregistrement\u2026");
+    try {
+      const response = await fetch(`${engineUrl}/api/config`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          typeof body.detail === "string" ? body.detail : "valeurs refusees par le moteur",
+        );
+      }
+      fill(body);
+      say("Enregistre — les modules redemarrent.", "ok");
+    } catch (error) {
+      say(`Echec : ${error.message}`, "error");
+    }
+  });
+}
+
 async function main() {
   setupUpdates();
   const engineUrl = await resolveEngineUrl();
@@ -360,6 +504,7 @@ async function main() {
   });
 
   $("checklist-reset").addEventListener("click", () => actions.reset());
+  setupSettings(engineUrl, post);
 
   const render = (state) => {
     renderMusic(state.music);

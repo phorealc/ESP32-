@@ -32,6 +32,7 @@ Ce n'est pas de l'authentification : le trafic reste en HTTP clair.
 | GET | `/api/stream` | bloc `stream` seul |
 | GET | `/api/donations` | alertes Streamlabs |
 | GET | `/api/checklist` | checklist seule |
+| GET | `/api/config` | reglages modifiables, **secrets masques** |
 | WS | `/ws` | etat complet pousse toutes les 500 ms |
 
 ## Ecriture (checklist)

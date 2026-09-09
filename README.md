@@ -192,6 +192,22 @@ C'est normal sans cles API : chaque carte indique sa raison
 (« cle API OpenWeatherMap manquante »...). Renseignez `config.toml`, puis
 relancez. `GET /api/health` liste l'etat de chaque module.
 
+## Reglages
+
+**Le plus simple : le bouton « Reglages » dans l'application PC.** Cles API,
+ville, serveurs Minecraft, logiciel de diffusion, jetons Streamlabs et Twitch —
+tout se saisit dans des champs, et s'applique sans redemarrer.
+
+Les cles deja enregistrees s'affichent masquees (`••••f43a`) : l'ecran montre
+qu'elles sont en place sans les reveler, et les laisser telles quelles ne les
+efface pas.
+
+L'ecriture n'est possible que depuis le PC qui heberge le moteur. Un autre
+appareil du reseau peut lire les reglages, secrets exclus, mais pas les modifier.
+
+Le fichier reste editable a la main si vous preferez — son chemin est affiche
+en haut de l'ecran de reglages.
+
 ## Configuration
 
 Le `config.toml` cree au premier lancement (copie de

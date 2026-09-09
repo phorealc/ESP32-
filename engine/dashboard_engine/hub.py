@@ -23,6 +23,15 @@ class Hub:
     """Detient les sources, la checklist et l'etat agrege servi par l'API."""
 
     def __init__(self, config: Config) -> None:
+        self.started_at = time.time()
+        self._build(config)
+
+    def _build(self, config: Config) -> None:
+        """(Re)construit les sources a partir d'une configuration.
+
+        Appele au demarrage et a chaque enregistrement des reglages : une cle
+        API saisie a l'ecran doit prendre effet sans redemarrer l'application.
+        """
         self.config = config
         self.music = build_music_source(config.music)
         self.servers = build_minecraft_source(config.minecraft)
@@ -30,7 +39,17 @@ class Hub:
         self.stream = build_stream_source(config.stream)
         self.donations = build_alerts_source(config.stream.streamlabs)
         self.checklist = ChecklistStore(config.checklist_path(), config.checklist.default_items)
-        self.started_at = time.time()
+
+    async def reload(self, config: Config) -> None:
+        """Applique une nouvelle configuration a chaud.
+
+        Les sources sont arretees avant d'etre remplacees : sans ca, l'ancienne
+        tache continuerait a ecrire dans un payload que plus personne ne lit,
+        et le socket Streamlabs resterait ouvert.
+        """
+        await self.stop()
+        self._build(config)
+        await self.start()
 
     @property
     def sources(self) -> list[Source]:

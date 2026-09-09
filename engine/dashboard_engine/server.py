@@ -11,6 +11,7 @@ import contextlib
 import logging
 import time
 from collections.abc import AsyncIterator
+from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ from starlette.websockets import WebSocketDisconnect
 from dashboard_engine.config import Config, load_config
 from dashboard_engine.hub import Hub, slim_state
 from dashboard_engine.models import API_VERSION, Checklist
+from dashboard_engine.sources.music import MusicSource, MusicUnavailable
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +40,12 @@ class ToggleRequest(BaseModel):
     id: str
     done: bool | None = None
     """`None` = bascule l'etat courant ; sinon force la valeur (idempotent)."""
+
+
+class MusicCommandRequest(BaseModel):
+    action: Literal["play", "pause", "toggle", "next", "previous", "stop", "seek"]
+    position_s: float = Field(default=0.0, ge=0)
+    """Position visee, en secondes. Utilise seulement par `seek`."""
 
 
 class AddItemRequest(BaseModel):
@@ -138,6 +146,33 @@ def create_app(config: Config | None = None) -> FastAPI:
     @app.get("/api/music", dependencies=[guard])
     async def get_music() -> dict:
         return hub.music.payload.model_dump()
+
+    @app.post("/api/music/command", dependencies=[guard])
+    async def music_command(body: MusicCommandRequest) -> dict:
+        """Pilote le lecteur du PC depuis l'ESP32 ou la coquille.
+
+        Les codes d'erreur distinguent les trois causes possibles, qui
+        appellent des reactions differentes cote client : module indisponible,
+        aucun lecteur actif, ou refus du lecteur.
+        """
+        source = hub.music
+        if not isinstance(source, MusicSource):
+            raise HTTPException(
+                status_code=503,
+                detail=source.payload.error or "module musique indisponible",
+            )
+        try:
+            await source.command(body.action, body.position_s)
+        except MusicUnavailable as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        except Exception as exc:
+            log.warning("commande musique %s refusee: %s", body.action, exc)
+            raise HTTPException(
+                status_code=502, detail=f"le lecteur a refuse la commande: {exc}"
+            ) from None
+        return {"ok": True, "action": body.action}
 
     @app.get("/api/music/art", dependencies=[guard])
     async def get_music_art() -> Response:

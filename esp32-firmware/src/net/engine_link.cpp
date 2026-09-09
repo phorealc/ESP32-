@@ -19,14 +19,21 @@ struct ToggleRequest {
 };
 
 constexpr uint8_t TOGGLE_QUEUE_DEPTH = 8;
+constexpr uint8_t MUSIC_QUEUE_DEPTH = 4;
+constexpr uint8_t ACTION_LEN = 12;
 constexpr uint32_t TASK_STACK_WORDS = 8192;
 constexpr UBaseType_t TASK_PRIORITY = 2;
 constexpr BaseType_t NETWORK_CORE = 0;
 constexpr TickType_t MUTEX_WAIT = pdMS_TO_TICKS(50);
 
+struct MusicCommand {
+  char action[ACTION_LEN];
+};
+
 DashboardState g_state;
 SemaphoreHandle_t g_mutex = nullptr;
 QueueHandle_t g_toggle_queue = nullptr;
+QueueHandle_t g_music_queue = nullptr;
 
 void drain_toggle_queue() {
   ToggleRequest request;
@@ -37,6 +44,15 @@ void drain_toggle_queue() {
       // action que l'utilisateur a entre-temps refaite dans l'autre sens.
       Serial.printf("[link] bascule %s perdue, resynchronisation au prochain cycle\n", request.id);
     }
+  }
+}
+
+void drain_music_queue() {
+  MusicCommand command;
+  while (xQueueReceive(g_music_queue, &command, 0) == pdTRUE) {
+    // Comme pour la checklist, un echec n'est pas rejoue : le cycle suivant
+    // publiera l'etat reel du lecteur.
+    api_music_command(command.action);
   }
 }
 
@@ -57,6 +73,9 @@ void network_task(void*) {
   wifi_begin();
   for (;;) {
     wifi_loop();
+    // Les commandes musique passent avant : c'est l'action pour laquelle
+    // l'utilisateur attend une reaction immediate a l'ecran.
+    drain_music_queue();
     drain_toggle_queue();
 
     // On travaille sur une copie hors mutex : le parsing JSON dure plusieurs
@@ -94,6 +113,7 @@ void network_task(void*) {
 void engine_link_begin() {
   g_mutex = xSemaphoreCreateMutex();
   g_toggle_queue = xQueueCreate(TOGGLE_QUEUE_DEPTH, sizeof(ToggleRequest));
+  g_music_queue = xQueueCreate(MUSIC_QUEUE_DEPTH, sizeof(MusicCommand));
   xTaskCreatePinnedToCore(network_task, "engine-link", TASK_STACK_WORDS, nullptr, TASK_PRIORITY,
                           nullptr, NETWORK_CORE);
 }
@@ -104,6 +124,21 @@ bool engine_link_snapshot(DashboardState& out) {
   out = g_state;
   xSemaphoreGive(g_mutex);
   return true;
+}
+
+bool engine_link_send_music(const char* action) {
+  if (g_music_queue == nullptr) return false;
+
+  // Retour visuel immediat sur la lecture/pause : le bouton doit repondre sous
+  // le doigt, le POST suit. Le prochain GET fait foi.
+  if (strcmp(action, "toggle") == 0 && xSemaphoreTake(g_mutex, MUTEX_WAIT) == pdTRUE) {
+    g_state.music.playing = !g_state.music.playing;
+    xSemaphoreGive(g_mutex);
+  }
+
+  MusicCommand command{};
+  copy_text(command.action, sizeof(command.action), action);
+  return xQueueSend(g_music_queue, &command, 0) == pdTRUE;
 }
 
 bool engine_link_request_toggle(const char* item_id, bool done) {

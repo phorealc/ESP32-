@@ -342,6 +342,10 @@ button:hover { border-color: var(--accent); }
 
 /* --- bandeau de mise a jour --- */
 
+/* `display: flex` l'emporterait sur l'attribut `hidden` du HTML : sans cette
+   regle, le bandeau s'affiche a chaque lancement, mise a jour ou pas. */
+.update-bar[hidden] { display: none; }
+
 .update-bar {
   display: flex;
   align-items: center;
@@ -357,3 +361,36 @@ button:hover { border-color: var(--accent); }
 .update-bar button { padding: 6px 12px; font-size: 13px; }
 .update-bar button#update-install { border-color: var(--accent); }
 .update-bar.busy button { opacity: 0.6; pointer-events: none; }
+
+/* --- transport musique --- */
+
+.transport {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-bottom: 12px;
+}
+
+.transport button {
+  min-width: 54px;
+  padding: 7px 14px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.transport button.primary {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-2));
+}
+
+/* Un bouton indisponible doit se lire comme tel, pas seulement refuser le clic :
+   tous les lecteurs n'exposent pas « suivant » ni la recherche. */
+.transport button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: var(--border);
+}
+
+/* La barre devient cliquable seulement quand le lecteur accepte la recherche. */
+.progress.seekable { cursor: pointer; }
+.progress.seekable:hover { outline: 1px solid var(--accent); outline-offset: 2px; }

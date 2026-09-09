@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 
 from dashboard_engine.config import MusicConfig
-from dashboard_engine.models import Music
+from dashboard_engine.models import Music, MusicControls
 from dashboard_engine.sources.base import DisabledSource, Source
 
 log = logging.getLogger(__name__)
@@ -35,6 +35,25 @@ except Exception as exc:  # ImportError sous Linux/macOS, OSError si WinRT absen
 
 MAX_ART_BYTES = 4 * 1024 * 1024
 """Garde-fou : une pochette au-dela de 4 Mio est ignoree."""
+
+TICKS_PER_SECOND = 10_000_000
+"""WinRT compte les durees en intervalles de 100 ns."""
+
+# Commandes acceptees par `POST /api/music/command`, et le nom de la methode
+# SMTC correspondante.
+ACTIONS: dict[str, str] = {
+    "play": "try_play_async",
+    "pause": "try_pause_async",
+    "toggle": "try_toggle_play_pause_async",
+    "next": "try_skip_next_async",
+    "previous": "try_skip_previous_async",
+    "stop": "try_stop_async",
+    "seek": "try_change_playback_position_async",
+}
+
+
+class MusicUnavailable(RuntimeError):
+    """Aucune session media a piloter, ou plateforme non supportee."""
 
 
 def is_supported() -> bool:
@@ -65,6 +84,28 @@ async def _read_stream_bytes(thumbnail) -> bytes:  # pragma: no cover - Windows 
         return bytes(out)
     except TypeError:
         return bytes(reader.read_bytes(buffer.length))
+
+
+def read_controls(playback) -> MusicControls:
+    """Traduit les capacites annoncees par SMTC.
+
+    Les attributs manquants sont traites comme indisponibles : mieux vaut un
+    bouton grise a tort qu'un bouton actif qui ne fait rien.
+    """
+    controls = getattr(playback, "controls", None)
+    if controls is None:
+        return MusicControls()
+
+    def enabled(name: str) -> bool:
+        return bool(getattr(controls, name, False))
+
+    return MusicControls(
+        can_play=enabled("is_play_enabled"),
+        can_pause=enabled("is_pause_enabled"),
+        can_next=enabled("is_next_enabled"),
+        can_previous=enabled("is_previous_enabled"),
+        can_seek=enabled("is_playback_position_enabled"),
+    )
 
 
 class MusicSource(Source[Music]):
@@ -104,9 +145,33 @@ class MusicSource(Source[Music]):
             position_s=timeline.position.total_seconds() if timeline.position else 0.0,
             duration_s=timeline.end_time.total_seconds() if timeline.end_time else 0.0,
         )
+        music.controls = read_controls(playback)
         await self._update_art(music, props)
         music.art_rev = self.art_rev
         return music
+
+    async def command(self, action: str, position_s: float = 0.0) -> None:
+        """Execute une commande de lecture sur la session courante.
+
+        Leve `MusicUnavailable` si aucun lecteur n'est actif : le lecteur peut
+        avoir ete ferme entre l'affichage du bouton et l'appui dessus.
+        """
+        method_name = ACTIONS.get(action)
+        if method_name is None:
+            raise ValueError(f"commande inconnue: {action}")
+
+        manager = await self._get_manager()
+        session = manager.get_current_session()
+        if session is None:
+            raise MusicUnavailable("aucun lecteur actif")
+
+        method = getattr(session, method_name)
+        if action == "seek":
+            await method(int(max(0.0, position_s) * TICKS_PER_SECOND))
+        else:
+            await method()
+        # Le prochain cycle de collecte publiera l'etat reel ; on ne devine pas
+        # ici ce que le lecteur a fait de la commande.
 
     async def _update_art(self, music: Music, props) -> None:  # pragma: no cover
         """Ne relit la pochette que lorsque le morceau change."""

@@ -30,6 +30,13 @@ void parse_music(JsonObjectConst src, MusicState& out) {
   out.position_s = src["position_s"] | 0.0f;
   out.duration_s = src["duration_s"] | 0.0f;
   out.art_rev = src["art_rev"] | 0;
+
+  JsonObjectConst controls = src["controls"];
+  out.controls.can_play = controls["can_play"] | false;
+  out.controls.can_pause = controls["can_pause"] | false;
+  out.controls.can_next = controls["can_next"] | false;
+  out.controls.can_previous = controls["can_previous"] | false;
+  out.controls.can_seek = controls["can_seek"] | false;
 }
 
 void parse_servers(JsonObjectConst src, ServersState& out) {
@@ -132,6 +139,34 @@ bool api_fetch_state(DashboardState& out) {
   parse_checklist(doc["checklist"], out.checklist);
   out.seq++;
   out.last_update_ms = millis();
+  return true;
+}
+
+bool api_music_command(const char* action) {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  WiFiClient client;
+  HTTPClient http;
+  http.setTimeout(HTTP_TIMEOUT_MS);
+  http.setConnectTimeout(HTTP_TIMEOUT_MS);
+
+  if (!http.begin(client, base_url() + "/api/music/command")) return false;
+  http.addHeader("Content-Type", "application/json");
+  apply_token(http);
+
+  JsonDocument body;
+  body["action"] = action;
+  String payload;
+  serializeJson(body, payload);
+
+  const int status = http.POST(payload);
+  http.end();
+  if (status != HTTP_CODE_OK) {
+    // 409 = plus aucun lecteur actif, 503 = module indisponible. Dans les deux
+    // cas le prochain cycle de polling remettra l'affichage d'aplomb.
+    Serial.printf("[api] commande musique %s a repondu %d\n", action, status);
+    return false;
+  }
   return true;
 }
 

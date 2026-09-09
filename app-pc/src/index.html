@@ -33,7 +33,12 @@
         <p class="state" id="music-state">—</p>
         <h2 class="title" id="music-title">Aucune lecture</h2>
         <p class="subtitle" id="music-artist"></p>
-        <div class="progress"><div class="progress-fill" id="music-progress"></div></div>
+        <div class="transport">
+          <button id="music-previous" type="button" title="Precedent (Ctrl+&larr;)" aria-label="Morceau precedent">&#9664;&#9664;</button>
+          <button id="music-toggle" type="button" class="primary" title="Lecture / pause (Ctrl+Espace)" aria-label="Lecture ou pause">&#9654;</button>
+          <button id="music-next" type="button" title="Suivant (Ctrl+&rarr;)" aria-label="Morceau suivant">&#9654;&#9654;</button>
+        </div>
+        <div class="progress" id="music-bar"><div class="progress-fill" id="music-progress"></div></div>
         <div class="times">
           <span id="music-elapsed">0:00</span>
           <span id="music-total">0:00</span>

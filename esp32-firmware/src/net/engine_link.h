@@ -14,6 +14,10 @@ void engine_link_begin();
 // (l'appelant garde alors sa copie precedente).
 bool engine_link_snapshot(DashboardState& out);
 
+// Envoie une commande de lecture ("toggle", "next", "previous"...).
+// L'appel rend la main immediatement : le POST part de la tache reseau.
+bool engine_link_send_music(const char* action);
+
 // Demande la bascule d'une case. L'etat local est mis a jour immediatement
 // (retour tactile instantane) et le POST part depuis la tache reseau.
 bool engine_link_request_toggle(const char* item_id, bool done);

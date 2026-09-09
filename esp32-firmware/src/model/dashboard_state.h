@@ -17,6 +17,16 @@ static const uint8_t LEN_SHORT = 24;   // id, code icone, version
 static const uint8_t LEN_LABEL = 48;   // nom de serveur, ville, scene OBS
 static const uint8_t LEN_TEXT = 96;    // titre de morceau, titre de stream
 
+// Commandes que le lecteur courant accepte. Tous n'exposent pas les memes :
+// on grise les boutons inutilisables plutot que de les laisser sans effet.
+struct MusicControls {
+  bool can_play = false;
+  bool can_pause = false;
+  bool can_next = false;
+  bool can_previous = false;
+  bool can_seek = false;
+};
+
 struct MusicState {
   bool available = false;
   bool playing = false;
@@ -24,6 +34,7 @@ struct MusicState {
   char artist[LEN_TEXT] = "";
   float position_s = 0.0f;
   float duration_s = 0.0f;
+  MusicControls controls;
   int32_t art_rev = 0;
 };
 

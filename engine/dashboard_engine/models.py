@@ -27,6 +27,21 @@ class SourceMeta(BaseModel):
     """Horodatage epoch de la derniere collecte reussie."""
 
 
+class MusicControls(BaseModel):
+    """Commandes que le lecteur courant accepte reellement.
+
+    Tous les lecteurs n'exposent pas les memes : YouTube dans un navigateur
+    n'offre souvent ni piste suivante ni recherche. Remonter l'information
+    permet de griser les boutons plutot que de les laisser sans effet.
+    """
+
+    can_play: bool = False
+    can_pause: bool = False
+    can_next: bool = False
+    can_previous: bool = False
+    can_seek: bool = False
+
+
 class Music(SourceMeta):
     playing: bool = False
     title: str = ""
@@ -37,6 +52,7 @@ class Music(SourceMeta):
 
     position_s: float = 0.0
     duration_s: float = 0.0
+    controls: MusicControls = Field(default_factory=MusicControls)
     art_rev: int = 0
     """Incremente a chaque nouvelle pochette. 0 = pas de pochette disponible.
 

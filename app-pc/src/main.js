@@ -95,9 +95,23 @@ function renderLink(status, detail = "") {
   $("link").title = detail;
 }
 
+/** Etat courant, garde pour la recherche : on ne relit pas le DOM pour ca. */
+let lastMusic = { duration_s: 0, controls: {} };
+
 function renderMusic(music) {
   const card = document.querySelector(".card-music");
   setCardAvailability(card, music.available);
+  lastMusic = music;
+
+  const controls = music.controls ?? {};
+  // Les capacites viennent du lecteur : Spotify accepte « suivant », un onglet
+  // YouTube souvent non.
+  $("music-previous").disabled = !music.available || !controls.can_previous;
+  $("music-next").disabled = !music.available || !controls.can_next;
+  $("music-toggle").disabled =
+    !music.available || !(music.playing ? controls.can_pause : controls.can_play);
+  $("music-toggle").textContent = music.playing ? "\u23F8" : "\u25B6";
+  $("music-bar").classList.toggle("seekable", Boolean(music.available && controls.can_seek));
 
   if (!music.available) {
     $("music-state").textContent = "Module indisponible";
@@ -159,11 +173,13 @@ function renderStream(stream) {
   const obs = stream.broadcaster ?? {};
   // Nommer le vrai logiciel : « OBS deconnecte » chez un utilisateur de
   // Streamlabs l'enverrait chercher au mauvais endroit.
-  const software = obs.kind === "streamlabs" ? "Streamlabs" : obs.kind === "obs" ? "OBS" : "Diffusion";
+  const software = obs.kind === "streamlabs" ? "Streamlabs" : obs.kind === "obs" ? "OBS" : "";
   setDot($("obs-dot"), obs.connected ? (obs.streaming ? "live" : "ok") : "");
   $("obs-text").textContent = obs.connected
     ? `${software} · ${obs.scene || "sans scene"} · ${Math.round(obs.fps)} fps · ${(obs.dropped_frames_pct ?? 0).toFixed(1)} % perdues${obs.recording ? " · REC" : ""}`
-    : `${software} deconnecte`;
+    : software
+      ? `${software} deconnecte`
+      : "Aucun logiciel de diffusion configure";
 }
 
 function renderStats(container, entries) {
@@ -294,6 +310,32 @@ async function main() {
       console.warn(`${path} a echoue`, error);
     }
   };
+
+  /** Pilote le lecteur du PC. L'etat reel revient au cycle suivant. */
+  const music = (action, extra = {}) => post("/api/music/command", { action, ...extra });
+
+  $("music-previous").addEventListener("click", () => music("previous"));
+  $("music-next").addEventListener("click", () => music("next"));
+  $("music-toggle").addEventListener("click", () => music("toggle"));
+
+  // Clic sur la barre = recherche, seulement si le lecteur l'accepte.
+  $("music-bar").addEventListener("click", (event) => {
+    if (!lastMusic.controls?.can_seek || !(lastMusic.duration_s > 0)) return;
+    const bar = event.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - bar.left) / bar.width));
+    music("seek", { position_s: ratio * lastMusic.duration_s });
+  });
+
+  // Raccourcis clavier : le dashboard sert pendant un live, les mains sont
+  // ailleurs. Ctrl evite de voler l'espace au champ de la checklist.
+  document.addEventListener("keydown", (event) => {
+    if (!event.ctrlKey || event.altKey || event.metaKey) return;
+    const shortcuts = { " ": "toggle", ArrowRight: "next", ArrowLeft: "previous" };
+    const action = shortcuts[event.key];
+    if (!action) return;
+    event.preventDefault();
+    music(action);
+  });
 
   const actions = {
     toggle: (id, done) => post("/api/checklist/toggle", { id, done }),
